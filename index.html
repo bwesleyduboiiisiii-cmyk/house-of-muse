@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="House of MUSE">
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <title>House of MUSE — Community Hub</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -94,6 +95,26 @@ tailwind.config = {
 <div id="toast" class="fixed z-[200] left-1/2 -translate-x-1/2 bottom-6 pointer-events-none flex flex-col gap-2 items-center"></div>
 
 <script>
+/* ===================================================================
+   PUSH NOTIFICATIONS (OneSignal) -- paste your OneSignal App ID below.
+   Get it from onesignal.com -> your app -> Settings -> Keys & IDs.
+   =================================================================== */
+var ONESIGNAL_APP_ID = 'da44b2ad-257a-4baf-a202-82f933238f91';
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+window._osReady = false;
+window.OneSignalDeferred.push(async function(OneSignal){
+  try{ if(!ONESIGNAL_APP_ID) return;
+    await OneSignal.init({ appId: ONESIGNAL_APP_ID, allowLocalhostAsSecureOrigin:true });
+    window._os = OneSignal; window._osReady = true;
+    if(typeof linkPush==='function') linkPush();
+  }catch(e){ console.warn('OneSignal init', e); }
+});
+function enableNotifications(){
+  if(!ONESIGNAL_APP_ID){ toast('Owner: add your OneSignal App ID first','bad'); return; }
+  if(window._os){ try{ window._os.Slidedown.promptPush(); }catch(e){ try{ window._os.User.PushSubscription.optIn(); }catch(_){ } } }
+  else { toast('Notifications still loading \u2014 try again in a moment','bad'); }
+}
+function linkPush(){ try{ const u=(typeof me==='function')?me():null; if(window._os && u){ window._os.login(String(u.id)); window._os.User.addTag('role', u.role||'Member'); window._os.User.addTag('callsign', u.username||''); } }catch(e){} }
 /* ============================================================
    HOUSE OF MUSE — Community Hub  (single-file prototype)
    Engine forked from MOP Community Hub. Same screens & rules,
@@ -238,6 +259,7 @@ async function loadProfiles(user){ if(_profLoading) return; _profLoading=true;
     if(!ROUTE) ROUTE='dashboard';
     await loadConfig(); await loadContent();
     render(); subscribeProfiles(); subscribeContent();
+    if(typeof linkPush==='function') linkPush();
   } finally { _profLoading=false; }
 }
 async function refetchProfiles(){ if(!sb) return; let res; try{ res=await sb.from('profiles').select('*'); }catch(e){ return; }
@@ -1553,6 +1575,11 @@ function viewSettings(){
             <div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Discord</label><input id="s_dc" value="${esc(u.discord)}" class="${IN}"/></div>
             <div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">What do you make?</label><textarea id="s_bio" rows="2" class="${IN} resize-none">${esc(u.bio)}</textarea></div>
           </div>
+        </section>
+        <section class="bg-panel border border-line rounded-2xl p-5">
+          <h3 class="font-display text-lg mb-1 flex items-center gap-2"><span class="text-orchid">\uD83D\uDD14</span>Notifications</h3>
+          <p class="text-[12px] text-steel mb-3">Get a ping on your phone for new missions, approvals, and squad news. On iPhone, add the app to your home screen first, then turn this on.</p>
+          <button onclick="enableNotifications()" class="text-sm px-4 py-2.5 rounded-xl font-semibold text-ink bg-gradient-to-b from-[#ff5a4d] to-orchid hover:brightness-110">Turn on notifications \u26A1</button>
         </section>
         <section class="bg-panel border border-line rounded-2xl p-5">
           <h3 class="font-display text-lg mb-3">Profile media</h3>

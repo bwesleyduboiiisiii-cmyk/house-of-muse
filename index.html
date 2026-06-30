@@ -210,7 +210,7 @@ function rowToMember(r){ const p=r.prefs||{};
     prefs:{ animations:p.animations!==false, nudges:p.nudges!==false, publicProfile:p.publicProfile!==false, sounds:!!p.sounds },
     rsvps:r.rsvps||[], done:r.done||[], inbox:r.inbox||[],
     joined_at: r.joined_at?new Date(r.joined_at).getTime():Date.now(),
-    feed:p._feed||[], xpLog:[], purchases:p._purchases||[], questDone:p._questDone||{}, roomLog:[], freezes:1, pending:[], onboarded:true,
+    feed:p._feed||[], xpLog:[], purchases:p._purchases||[], questDone:p._questDone||{}, roomLog:[], freezes:1, pending:p._pending||[], onboarded:true,
     _lore:!!p._lore, _hideChecklist:!!p._hideChecklist };
 }
 function memberToRow(u){ const pr=u.prefs||{};
@@ -220,7 +220,7 @@ function memberToRow(u){ const pr=u.prefs||{};
     avatar_url:u.avatarImg||null, banner_url:u.bannerImg||null,
     badges:u.badges||[], socials:u.socials||{},
     prefs:{ animations:pr.animations!==false, nudges:pr.nudges!==false, publicProfile:pr.publicProfile!==false, sounds:!!pr.sounds,
-            _last_checkin:u.last_checkin||null, _purchases:u.purchases||[], _feed:(u.feed||[]).slice(0,40), _questDone:u.questDone||{}, _lore:!!u._lore, _hideChecklist:!!u._hideChecklist },
+            _last_checkin:u.last_checkin||null, _purchases:u.purchases||[], _feed:(u.feed||[]).slice(0,40), _questDone:u.questDone||{}, _pending:u.pending||[], _lore:!!u._lore, _hideChecklist:!!u._hideChecklist },
     rsvps:u.rsvps||[], done:u.done||[], inbox:u.inbox||[] };
 }
 function upsertProfile(u){ if(!u||!sb) return; sb.from('profiles').update(memberToRow(u)).eq('id',u.id).then(r=>{ if(r.error) console.warn('save', r.error.message); }); }
@@ -234,8 +234,8 @@ async function loadProfiles(user){ if(_profLoading) return; _profLoading=true;
     if(!mine){ pendingAuthUser=user; AUTHVIEW='onboard'; DB.currentUserId=null; viewLogin(); return; }
     DB.currentUserId=user.id; pendingAuthUser=null; AUTHVIEW=null;
     if(!ROUTE) ROUTE='dashboard';
-    await loadConfig();
-    render(); subscribeProfiles();
+    await loadConfig(); await loadContent();
+    render(); subscribeProfiles(); subscribeContent();
   } finally { _profLoading=false; }
 }
 async function refetchProfiles(){ if(!sb) return; let res; try{ res=await sb.from('profiles').select('*'); }catch(e){ return; }
@@ -451,7 +451,7 @@ function seed(){
     m.rsvps  = events.slice(0, [4,3,3,2,2,1,1,1,0,0][i] ?? 0).map(e=>e.id);
     m.inbox  = (i===6||i===8) ? [{id:'seed_'+i, type:'nudge', from:'RED_LEADER', text:'Haven\u2019t seen you morph in \u2014 jump back on and keep your streak alive! \uD83D\uDC51', t:now-1*day, read:false}] : [];
     m.freezes = [2,1,1,2,1,1,1,0,1,0][i] ?? 1;
-    m.pending = (i===2||i===4) ? [{id:'c5', t:now-(i)*day}] : [];
+    m.pending = (i===2||i===4) ? [{pid:'demo'+i, kind:'challenge', ref:'c5', title:'Sample drill submission', xp:120, coins:60, note:'', t:now-(i)*day}] : [];
   });
 
   return {
@@ -538,7 +538,6 @@ const NAV = [
   ['challenges','Training','flame'],
   ['badges','Medals','check'],
   ['hall','Hall of Legends','crown'],
-  ['armory','Armory','shield'],
   ['store','Store','coin'],
   ['settings','Settings','spark'],
 ];
@@ -546,7 +545,7 @@ const NAV = [
 function sidebar(){
   const u=me();
   const META={}; NAV.forEach(([id,label,ic])=>META[id]=[label,ic]); META['inbox']=['Inbox','bell'];
-  const order = ['dashboard','salon','battles','events','challenges','leaderboard','feed','rooms','badges','hall','armory','store','inbox','settings'];
+  const order = ['dashboard','salon','battles','events','challenges','leaderboard','feed','rooms','badges','hall','store','inbox','settings'];
   const item=(id)=>{ const mt=META[id]; if(!mt) return ''; const active=ROUTE===id; const un=id==='inbox'?unread(u):0;
     return `<button onclick="route('${id}')" aria-label="${mt[0]}" class="relative w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-left text-[14px] transition ${active?'text-chalk font-semibold':'text-silver hover:text-chalk hover:bg-raised/50'}" ${active?"style='background:linear-gradient(90deg,rgba(225,43,56,.22),rgba(225,43,56,.05));box-shadow:inset 0 0 0 1px rgba(225,43,56,.35),0 0 18px -6px rgba(225,43,56,.6)'":""}>
       ${active?"<span class='absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r bg-orchid'></span>":""}
@@ -1226,7 +1225,7 @@ function saveChallengeForm(){
   else { obj.id='c_'+Date.now().toString(36); DB.challenges.push(obj); }
   editing=null; save(); render(); toast('Drill saved','gold');
 }
-function deleteChallenge(id){ if(!confirm('Delete this drill? It is removed from everyone\u2019s progress.')) return; DB.challenges=DB.challenges.filter(c=>c.id!==id); DB.members.forEach(m=>{ m.done=(m.done||[]).filter(x=>x!==id); m.pending=(m.pending||[]).filter(p=>p.id!==id); }); editing=null; save(); render(); toast('Drill deleted'); }
+function deleteChallenge(id){ if(!confirm('Delete this drill? It is removed from everyone\u2019s progress.')) return; DB.challenges=DB.challenges.filter(c=>c.id!==id); DB.members.forEach(m=>{ m.done=(m.done||[]).filter(x=>x!==id); m.pending=(m.pending||[]).filter(p=>p.ref!==id); }); editing=null; save(); render(); toast('Drill deleted'); }
 var battleFilter='all';
 function snapBattleForm(){ if(!editing||editing.kind!=='battle') return; const g=id=>{const el=document.getElementById(id);return el?el.value:'';};
   editing.fighterId=g('bd_fighter')||editing.fighterId; editing.opponent=g('bd_opp'); editing.community=g('bd_comm'); editing.result=g('bd_result')||editing.result; editing.score=g('bd_score'); editing.platform=g('bd_plat'); const ts=new Date(g('bd_date')).getTime(); if(!isNaN(ts)) editing.date=ts; editing.link=g('bd_link'); editing.note=g('bd_note'); }
@@ -1369,7 +1368,7 @@ function viewChallenges(){
   const pct=total?Math.round(done/total*100):0;
   const days=Math.max(0,Math.ceil((DB.season.ends-Date.now())/86400000));
   const cards=DB.challenges.map((c,i)=>{
-    const isDone=u.done.includes(c.id); const isPending=(u.pending||[]).some(p=>p.id===c.id); const needs=needsApproval(c);
+    const isDone=u.done.includes(c.id); const isPending=(u.pending||[]).some(p=>p.kind==='challenge'&&p.ref===c.id);
     const c2=[ '#E12B38','#2563EB','#FFC83D','#16A34A','#FF3D9A','#111114'][i%6];
     const bdg=c.badge?DB.badges[c.badge]:null;
     return `<div class="bg-panel border border-line rounded-2xl p-4 ${isDone?'opacity-70':''}" style="box-shadow:inset 4px 0 0 ${c2}">
@@ -1381,7 +1380,7 @@ function viewChallenges(){
             <span class="text-orchid font-mono">+${c.xp} Power</span>
             <span class="text-gold font-mono">+${c.coins} Energy</span>
             ${bdg?`<span class="text-steel">+ ${bdg.glyph} ${esc(bdg.name)}</span>`:''}
-            ${needs&&!isDone?`<span class="text-steel/60">\u2022 needs owner approval</span>`:''}
+            ${!isDone&&!isPending?`<span class="text-steel/60">\u2022 needs owner approval</span>`:''}
           </div>
         </div>
         ${isDone?`<div class="shrink-0 w-10 h-10 rounded-full grid place-items-center bg-gold/20 text-gold">${ICON.check.replace('w-full h-full','w-5 h-5')}</div>`
@@ -1573,10 +1572,9 @@ function viewSettings(){
         <section class="bg-panel border border-line rounded-2xl p-5"><h3 class="font-display text-lg mb-2">Find the Squad</h3>${DB.links.map(l=>`<a href="${l.url}" target="_blank" rel="noopener" class="flex items-center gap-2 text-sm text-silver hover:text-orchid py-1"><span>${l.glyph}</span>${esc(l.name)}</a>`).join('')}</section>
         <section class="bg-panel border border-line rounded-2xl p-5">
           <h3 class="font-display text-lg mb-2">Backup</h3>
-          <p class="text-[11px] text-steel mb-3">Everything lives in this browser. Download a backup to keep it safe or move devices.</p>
+          <p class="text-[11px] text-steel mb-3">Your account and progress sync to the cloud. Download a personal snapshot anytime.</p>
           <div class="flex flex-col gap-2">
             <button onclick="exportData()" class="w-full text-[12px] py-2 rounded-lg bg-orchid/20 text-orchid hover:bg-orchid/30">\u2193 Download backup</button>
-            <label class="w-full text-[12px] py-2 rounded-lg bg-raised border border-line text-silver hover:text-chalk text-center cursor-pointer">Restore from backup<input type="file" accept="application/json,.json" class="hidden" onchange="importData(this)"></label>
             <button onclick="installApp()" class="w-full text-[12px] py-2 rounded-lg bg-gold/15 text-gold hover:bg-gold/25">Install app on this device</button>
           </div>
         </section>
@@ -1633,12 +1631,13 @@ function viewAdmin(){
   }).join('');
 
   const subs=[]; DB.members.forEach(m=>(m.pending||[]).forEach(p=>subs.push({m,p}))); subs.sort((a,b)=>a.p.t-b.p.t);
-  const reviewBody = subs.length ? subs.map(({m,p})=>{ const c=DB.challenges.find(x=>x.id===p.id);
-    return `<div class="flex items-center gap-3 p-4 bg-panel border border-line rounded-2xl">
-      <button onclick="openProfile('${m.id}')" aria-label="${esc(m.username)}" class="shrink-0">${avatar(m.username,32,colorHex(m.color))}</button>
-      <div class="min-w-0 flex-1"><div class="text-[13px] text-chalk">${esc(m.username)} <span class="text-steel">submitted</span> <span class="text-silver">${esc(c?c.title:p.id)}</span></div>
-      <div class="text-[11px] text-steel">${timeAgo(p.t)} \u00b7 +${c?c.xp:0} Power${c&&c.coins?', +'+c.coins+' Energy':''}</div></div>
-      ${isOwner?`<div class="flex gap-2 shrink-0"><button onclick="approveSubmission('${m.id}','${p.id}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30">Approve</button><button onclick="declineSubmission('${m.id}','${p.id}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-rose/15 text-rose hover:bg-rose/25">Decline</button></div>`:'<span class="text-[11px] text-steel shrink-0">owner reviews</span>'}
+  const reviewBody = subs.length ? subs.map(({m,p})=>{
+    return `<div class="flex items-start gap-3 p-4 bg-panel border border-line rounded-2xl">
+      <button onclick="openProfile('${m.id}')" aria-label="${esc(m.username)}" class="shrink-0 mt-0.5">${avatar(m.username,32,colorHex(m.color))}</button>
+      <div class="min-w-0 flex-1"><div class="text-[13px] text-chalk">${esc(m.username)} <span class="text-steel">submitted</span> <span class="text-silver">${esc(p.title||p.ref||'a task')}</span> <span class="text-[10px] px-1.5 py-0.5 rounded ${p.kind==='quest'?'bg-orchid/15 text-orchid':'bg-gold/15 text-gold'}">${p.kind==='quest'?'Quest':'Drill'}</span></div>
+      <div class="text-[11px] text-steel">${timeAgo(p.t)} \u00b7 +${p.xp||0} Power${p.coins?', +'+p.coins+' Energy':''}</div>
+      ${p.note?`<div class="text-[12px] text-silver mt-1.5 p-2 rounded-lg bg-raised border border-line">\u201C${esc(p.note)}\u201D</div>`:`<div class="text-[11px] text-steel/60 mt-1">No proof note attached</div>`}</div>
+      ${isOwner?`<div class="flex flex-col gap-2 shrink-0"><button onclick="approveSubmission('${m.id}','${p.pid}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30">Approve</button><button onclick="declineSubmission('${m.id}','${p.pid}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-rose/15 text-rose hover:bg-rose/25">Decline</button></div>`:'<span class="text-[11px] text-steel shrink-0">owner reviews</span>'}
     </div>`; }).join('') : `<div class="text-sm text-steel py-10 text-center">No submissions waiting \u2014 the squad\u2019s all caught up. \uD83C\uDF89</div>`;
   const tab=(id,label)=>`<button onclick="adminView='${id}';render()" class="px-3 py-1.5 rounded-lg text-xs ${adminView===id?'tab-on':'bg-raised text-steel'}">${label}</button>`;
 
@@ -1687,28 +1686,28 @@ function needsApproval(c){ return !!(c && (c.badge || c.xp>=120)); }
 function completeChallenge(id){
   const u=me();
   if(u.done.includes(id)){ toast('Already done','bad'); return; }
-  if((u.pending||[]).some(p=>p.id===id)){ toast('Already submitted \u2014 waiting on review','bad'); return; }
-  const c=DB.challenges.find(x=>x.id===id);
-  if(needsApproval(c)){ u.pending=u.pending||[]; u.pending.push({id,t:Date.now()}); save(); render(); toast('Submitted for review \u2014 the owner will confirm it \u23F3','gold'); return; }
-  u.done.push(id);
-  awardXP(u,c.xp,'Training: '+c.title); awardCoins(u,c.coins,'Training: '+c.title);
-  if(c.badge) earnBadge(u,c.badge);
-  save(); render(); toast(`Training done \u00b7 +${c.xp} Power +${c.coins} Energy`,'gold');
+  if((u.pending||[]).some(p=>p.kind==='challenge'&&p.ref===id)){ toast('Already submitted \u2014 waiting on review','bad'); return; }
+  const c=DB.challenges.find(x=>x.id===id); if(!c) return;
+  const note=(prompt('Show your work \u2014 add a link or note as proof for the owner (optional):')||'').trim();
+  u.pending=u.pending||[]; u.pending.push({pid:'s_'+Date.now().toString(36)+Math.floor(Math.random()*999), kind:'challenge', ref:id, title:c.title, xp:c.xp, coins:c.coins, badge:c.badge||null, note, t:Date.now()});
+  upsertProfile(u); render(); toast('Submitted for review \u2014 the owner will confirm it \u23F3','gold');
 }
-function approveSubmission(mid,cid){
+function approveSubmission(mid,pid){
   const m=DB.members.find(x=>x.id===mid); if(!m) return;
-  m.pending=(m.pending||[]).filter(p=>p.id!==cid);
-  if(!m.done.includes(cid)){ m.done.push(cid); const c=DB.challenges.find(x=>x.id===cid);
-    if(c){ awardXP(m,c.xp,'Training: '+c.title); awardCoins(m,c.coins,'Training: '+c.title); if(c.badge) earnBadge(m,c.badge);
-      pushInbox(mid,'message',`\u2705 Your submission \u201C${c.title}\u201D was approved \u2014 +${c.xp} Power, +${c.coins} Energy!`); } }
-  save(); render(); toast(`Approved ${m.username}\u2019s submission`,'gold');
+  const p=(m.pending||[]).find(x=>x.pid===pid); if(!p){ render(); return; }
+  m.pending=(m.pending||[]).filter(x=>x.pid!==pid);
+  if(p.kind==='quest'){ m.questDone=m.questDone||{}; m.questDone[p.qscope]=m.questDone[p.qscope]||{}; const key=p.qscope==='daily'?_dayKey():_weekKey(); m.questDone[p.qscope][key]=m.questDone[p.qscope][key]||[]; if(!m.questDone[p.qscope][key].includes(p.ref)) m.questDone[p.qscope][key].push(p.ref); }
+  else { if(!m.done.includes(p.ref)) m.done.push(p.ref); }
+  awardXP(m,p.xp||0,'Approved: '+p.title); awardCoins(m,p.coins||0,'Approved: '+p.title); if(p.badge) earnBadge(m,p.badge);
+  pushInbox(mid,'message',`\u2705 \u201C${p.title}\u201D approved \u2014 +${p.xp||0} Power, +${p.coins||0} Energy!`);
+  upsertOther(m); render(); toast(`Approved ${m.username}\u2019s submission`,'gold');
 }
-function declineSubmission(mid,cid){
+function declineSubmission(mid,pid){
   const m=DB.members.find(x=>x.id===mid); if(!m) return;
-  m.pending=(m.pending||[]).filter(p=>p.id!==cid);
-  const c=DB.challenges.find(x=>x.id===cid);
-  pushInbox(mid,'message',`Your submission \u201C${c?c.title:'training'}\u201D needs another look \u2014 give it another go and resubmit.`);
-  save(); render(); toast(`Sent back to ${m.username}`);
+  const p=(m.pending||[]).find(x=>x.pid===pid);
+  m.pending=(m.pending||[]).filter(x=>x.pid!==pid);
+  pushInbox(mid,'message',`Your submission \u201C${p?p.title:'task'}\u201D needs another look \u2014 give it another go and resubmit.`);
+  upsertOther(m); render(); toast(`Sent back to ${m.username}`);
 }
 function buy(id){
   const u=me(); const s=DB.store.find(x=>x.id===id);
@@ -2093,8 +2092,8 @@ function memberStatus(m){
 function lastSeen(m){ const ds=daysSinceCheckin(m); if(ds===Infinity) return 'Never'; if(ds===0) return 'Today'; if(ds===1) return 'Yesterday'; return ds+'d ago'; }
 function pushInbox(memberId, type, text){
   const m=DB.members.find(x=>x.id===memberId); if(!m) return;
-  m.inbox=m.inbox||[]; m.inbox.unshift({id:'n_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), type, from:me().username, text, t:Date.now(), read:false});
-  m.inbox=m.inbox.slice(0,60); save();
+  m.inbox=m.inbox||[]; m.inbox.unshift({id:'n_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), type, from:(me()?me().username:'HQ'), text, t:Date.now(), read:false});
+  m.inbox=m.inbox.slice(0,60);
 }
 function sendNudge(id){ const m=DB.members.find(x=>x.id===id); if(!m) return;
   pushInbox(id,'nudge',`Time to check in, ${m.username}! Keep your streak alive and knock out this week\u2019s training. \uD83D\uDC51`);
@@ -2189,33 +2188,6 @@ function viewBattles(){
     ${editorOverlay()}
   `);
 }
-function equipSuit(name){ const u=me(); u.suit=name; save(); render(); toast(name+' suit equipped','gold'); }
-function viewArmory(){
-  const u=me(); const equipped=u.suit||u.color||'Red'; const c=colorHex(equipped);
-  const suits=RANGER_COLORS.map(rc=>{ const on=equipped===rc.name; const h=rc.hex;
-    return `<button onclick="equipSuit('${rc.name}')" class="relative rounded-2xl p-3 text-center transition" style="background:${h}14;border:1px solid ${on?h:h+'33'};${on?'box-shadow:0 0 22px -6px '+h+', inset 0 0 0 1px '+h:''}">
-      ${on?`<span class="absolute top-2 right-2 w-4 h-4 rounded-full grid place-items-center text-[10px]" style="background:${h};color:#0B0A12">✓</span>`:''}
-      <div class="grid place-items-center mb-1.5">${avatar(u.username,52,h)}</div>
-      <div class="text-[12px] font-semibold truncate">${rc.name}</div>
-      <div class="text-[10px] mt-1 px-2 py-0.5 rounded inline-block" style="background:${h}22;color:${h}">${on?'EQUIPPED':'EQUIP'}</div>
-    </button>`; }).join('');
-  const gear=[['Morpher','⚡',5,'#2563EB'],['Power Blade','⚔️',4,'#7C3AED'],['Power Gun','🔫',3,'#16A34A'],['Power Daggers','🗡️',3,'#FFC83D'],['Helmet Mod','🪖',2,'#E12B38'],['Chest Plate','🛡️',4,'#FF3D9A']]
-    .map(g=>`<div class="bg-raised border border-line rounded-xl p-3 text-center"><div class="text-2xl">${g[1]}</div><div class="text-[11px] mt-1 truncate">${g[0]}</div><div class="text-[10px] mt-1" style="color:${g[3]}">Level ${g[2]}</div></div>`).join('');
-  app.innerHTML = shell(`
-    ${banner('Gear up. Suit up. Show up.','Armory','Customize your loadout and rep your color. Equip a suit — it persists as your Armory look.')}
-    <div class="grid lg:grid-cols-3 gap-4">
-      <div class="lg:col-span-2 space-y-4">
-        <section class="bg-panel border border-line rounded-2xl p-5"><h3 class="font-display text-xl mb-3">Ranger Suits</h3><div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">${suits}</div></section>
-        <section class="bg-panel border border-line rounded-2xl p-5"><h3 class="font-display text-xl mb-3">Gear Loadout</h3><div class="grid grid-cols-3 sm:grid-cols-6 gap-3">${gear}</div></section>
-      </div>
-      <div class="space-y-4">
-        <section class="relative overflow-hidden bg-panel border border-line rounded-2xl p-5 text-center"><div class="absolute inset-0" style="background:radial-gradient(90% 110% at 50% 0%, ${c}33, transparent 60%)"></div><div class="relative"><div class="text-[10px] uppercase tracking-[.2em] text-gold/80">Equipped Suit</div><div class="grid place-items-center my-2">${avatar(u.username,80,c)}</div><div class="font-display text-xl" style="color:${c}">${esc(equipped)} Ranger</div><div class="text-[11px] text-steel mt-1">Power Level <span class="font-mono text-chalk">${fmt(u.xp)}</span></div></div></section>
-        <section class="bg-panel border border-line rounded-2xl p-5"><h3 class="font-display text-lg mb-2">Collections</h3>${[['Suits',RANGER_COLORS.length+'/'+RANGER_COLORS.length],['Weapons','6/12'],['Zord Gear','6/12'],['Upgrades','18/30'],['Emotes','9/15']].map(x=>`<div class="flex items-center justify-between py-1.5 text-[12px]"><span class="text-steel">${x[0]}</span><span class="font-mono text-chalk">${x[1]}</span></div>`).join('')}</section>
-      </div>
-    </div>
-  `);
-}
-
 function ensureLore(u){ if(u._lore) return; u._lore=true; u.inbox=u.inbox||[];
   [{from:'Zordon (HQ)',text:'A new mission has been assigned to your squad. Review the briefing and prepare. The Power is in your hands.'},
    {from:'Alpha 5',text:'Ay-yi-yi! A new training module is unlocked, Ranger. Head to the Academy and power up.'},
@@ -2248,7 +2220,7 @@ function uploadPic(input, kind){
   reader.readAsDataURL(file);
 }
 function clearPic(kind){ const u=me(); if(kind==='banner') u.bannerImg=null; else u.avatarImg=null; if(typeof upsertProfile==='function') upsertProfile(u); else save(); render(); toast('Removed'); }
-const VIEWS={dashboard:viewDashboard,profile:viewProfile,inbox:viewInbox,feed:viewFeed,salon:viewSalon,rooms:viewRooms,leaderboard:viewLeaderboard,battles:viewBattles,armory:viewArmory,events:viewEvents,challenges:viewChallenges,badges:viewBadges,hall:viewHall,store:viewStore,settings:viewSettings,admin:viewAdmin};
+const VIEWS={dashboard:viewDashboard,profile:viewProfile,inbox:viewInbox,feed:viewFeed,salon:viewSalon,rooms:viewRooms,leaderboard:viewLeaderboard,battles:viewBattles,events:viewEvents,challenges:viewChallenges,badges:viewBadges,hall:viewHall,store:viewStore,settings:viewSettings,admin:viewAdmin};
 function route(name){ if(activeRoom) disposeCall(); ROUTE=name; render(); window.scrollTo({top:0,behavior:'smooth'}); }
 var paletteOpen=false, palQuery='';
 function openPalette(){ paletteOpen=true; palQuery=''; render(); }
@@ -2259,7 +2231,7 @@ function palResults(q){
   q=(q||'').trim().toLowerCase(); const rows=[];
   const sm=k=>ICON[k].replace('w-full h-full','w-4 h-4');
   const add=(label,sub,icon,kind,id,tint)=>rows.push(`<button onclick="palGo('${kind}','${id}')" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-raised text-left"><span class="w-8 h-8 rounded-lg grid place-items-center shrink-0" style="background:${(tint||'#9B93AE')}1f;color:${tint||'#9B93AE'}">${icon}</span><div class="min-w-0 flex-1"><div class="text-[13px] text-chalk truncate">${esc(label)}</div><div class="text-[10px] text-steel truncate">${esc(sub)}</div></div></button>`);
-  const pages=[['dashboard','HQ'],['salon','The Squad'],['battles','Battles'],['events','Missions'],['challenges','Training'],['leaderboard','Rankings'],['feed','The Buzz'],['rooms','Comms'],['badges','Medals'],['hall','Hall of Legends'],['armory','Armory'],['store','Store'],['inbox','Inbox'],['settings','Settings']];
+  const pages=[['dashboard','HQ'],['salon','The Squad'],['battles','Battles'],['events','Missions'],['challenges','Training'],['leaderboard','Rankings'],['feed','The Buzz'],['rooms','Comms'],['badges','Medals'],['hall','Hall of Legends'],['store','Store'],['inbox','Inbox'],['settings','Settings']];
   pages.filter(p=>!q||p[1].toLowerCase().includes(q)).slice(0,q?4:6).forEach(p=>add(p[1],'Go to page',sm('spark'),'route',p[0],'#E12B38'));
   if(q){
     DB.members.filter(m=>m.username.toLowerCase().includes(q)).slice(0,5).forEach(m=>add(m.username,(m.color?m.color+' Ranger':'Ranger'),sm('crown'),'profile',m.id,colorHex(m.color)));
@@ -2392,10 +2364,10 @@ function _seedShuffle(arr, seed){ const a=arr.slice(); let s=0; for(let k=0;k<se
 function questPool(scope){ const cfg=(DB.app_config&&DB.app_config.questPool)||null; if(cfg&&cfg[scope]&&cfg[scope].length) return cfg[scope]; return scope==='daily'?DAILY_POOL:WEEKLY_POOL; }
 function todaysQuests(scope){ const pool=questPool(scope); const key=scope==='daily'?_dayKey():_weekKey(); const n=scope==='daily'?4:3; return _seedShuffle(pool,scope+key).slice(0,n); }
 function questDoneSet(scope){ const u=me(); if(!u) return []; u.questDone=u.questDone||{}; u.questDone[scope]=u.questDone[scope]||{}; const key=scope==='daily'?_dayKey():_weekKey(); u.questDone[scope][key]=u.questDone[scope][key]||[]; return u.questDone[scope][key]; }
-function completeQuest(scope,id){ const u=me(); const set=questDoneSet(scope); if(set.includes(id)) return; const q=questPool(scope).find(x=>x.id===id)||(scope==='daily'?DAILY_POOL:WEEKLY_POOL).find(x=>x.id===id); if(!q) return; set.push(id); awardXP(u,q.xp,'Quest: '+q.title); awardCoins(u,q.coins,'Quest: '+q.title); save(); render(); toast('+'+q.xp+' Power · quest complete','gold'); }
+function completeQuest(scope,id){ const u=me(); const set=questDoneSet(scope); if(set.includes(id)) return; if((u.pending||[]).some(p=>p.kind==='quest'&&p.ref===id&&p.qscope===scope)){ toast('Already submitted \u2014 waiting on review','bad'); return; } const q=questPool(scope).find(x=>x.id===id)||(scope==='daily'?DAILY_POOL:WEEKLY_POOL).find(x=>x.id===id); if(!q) return; const note=(prompt('Show your work \u2014 add a link or note as proof (optional):')||'').trim(); u.pending=u.pending||[]; u.pending.push({pid:'s_'+Date.now().toString(36)+Math.floor(Math.random()*999), kind:'quest', ref:id, qscope:scope, title:q.title, xp:q.xp, coins:q.coins, badge:null, note, t:Date.now()}); upsertProfile(u); render(); toast('Submitted for review \u23F3','gold'); }
 function questBoard(){ const dq=todaysQuests('daily'), wq=todaysQuests('weekly'); const dset=questDoneSet('daily'), wset=questDoneSet('weekly');
-  const card=(q,scope,set)=>{ const done=set.includes(q.id);
-    return `<div class="flex items-center gap-3 p-2.5 rounded-xl ${done?'bg-emerald-500/10':'bg-raised'}"><span class="text-xl shrink-0">${q.glyph||'⚡'}</span><div class="min-w-0 flex-1"><div class="text-[13px] ${done?'text-steel line-through':'text-chalk'}">${esc(q.title)}</div><div class="text-[10px] text-steel">+${q.xp} Power · +${q.coins} Energy</div></div><button onclick="completeQuest('${scope}','${q.id}')" ${done?'disabled':''} class="shrink-0 text-[11px] px-2.5 py-1 rounded-lg ${done?'bg-emerald-500/20 text-emerald-300':'bg-orchid/20 text-orchid hover:bg-orchid/30'}">${done?'✓ Done':'Claim'}</button></div>`; };
+  const card=(q,scope,set)=>{ const done=set.includes(q.id); const uu=me(); const pend=(uu.pending||[]).some(p=>p.kind==='quest'&&p.ref===q.id&&p.qscope===scope); const dis=done||pend; const lbl=done?'✓ Done':pend?'Pending':'Claim';
+    return `<div class="flex items-center gap-3 p-2.5 rounded-xl ${done?'bg-emerald-500/10':pend?'bg-orchid/10':'bg-raised'}"><span class="text-xl shrink-0">${q.glyph||'⚡'}</span><div class="min-w-0 flex-1"><div class="text-[13px] ${done?'text-steel line-through':'text-chalk'}">${esc(q.title)}</div><div class="text-[10px] text-steel">+${q.xp} Power · +${q.coins} Energy</div></div><button onclick="completeQuest('${scope}','${q.id}')" ${dis?'disabled':''} class="shrink-0 text-[11px] px-2.5 py-1 rounded-lg ${done?'bg-emerald-500/20 text-emerald-300':pend?'bg-orchid/20 text-orchid':'bg-orchid/20 text-orchid hover:bg-orchid/30'}">${lbl}</button></div>`; };
   const dDone=dq.filter(q=>dset.includes(q.id)).length, wDone=wq.filter(q=>wset.includes(q.id)).length;
   return `<section class="bg-panel border border-line rounded-2xl p-5 mb-5"><div class="grid md:grid-cols-2 gap-5">
     <div><div class="flex items-center justify-between mb-2"><h3 class="font-display text-lg">Daily Quests <span class="text-[12px] text-steel font-body">${dDone}/${dq.length}</span></h3><span class="text-[10px] text-steel">fresh set daily</span></div><div class="space-y-2">${dq.map(q=>card(q,'daily',dset)).join('')}</div></div>
@@ -2412,6 +2384,34 @@ function questAdmin(){
   return `<div class="grid md:grid-cols-2 gap-4 max-w-3xl"><div class="bg-panel border border-line rounded-2xl p-4"><h3 class="font-display text-lg mb-2">Daily pool</h3><div class="space-y-1.5">${list('daily')}</div>${adder('daily')}</div><div class="bg-panel border border-line rounded-2xl p-4"><h3 class="font-display text-lg mb-2">Weekly pool</h3><div class="space-y-1.5">${list('weekly')}</div>${adder('weekly')}</div><p class="text-[11px] text-steel md:col-span-2">The squad auto-sees a fresh rotated set each day/week from these pools — you never enter quests manually. Edits save instantly.</p></div>`;
 }
 async function loadConfig(){ if(!sb){ DB.app_config=DB.app_config||{}; return; } try{ const {data,error}=await sb.from('app_config').select('data').eq('id',1).single(); DB.app_config=(!error&&data&&data.data)?data.data:(DB.app_config||{}); }catch(e){ DB.app_config=DB.app_config||{}; } }
+async function loadContent(){ if(!sb) return;
+  try{
+    const [ev,ch,ba,po,ro,re]=await Promise.all([
+      sb.from('events').select('*'),
+      sb.from('challenges').select('*'),
+      sb.from('battles').select('*'),
+      sb.from('posts').select('*').order('created_at',{ascending:false}),
+      sb.from('rooms').select('*'),
+      sb.from('reactions').select('*')
+    ]);
+    if(ev.data&&ev.data.length) DB.events=ev.data.map(e=>({id:e.id,title:e.title,category:e.category,platform:e.platform,starts_at:e.starts_at?new Date(e.starts_at).getTime():Date.now(),reward:e.reward,desc:e.descr||''}));
+    if(ch.data&&ch.data.length) DB.challenges=ch.data.map(c=>({id:c.id,title:c.title,desc:c.descr||'',xp:c.xp,coins:c.coins,badge:c.badge||''}));
+    DB.battles=(ba.data||[]).map(b=>({id:b.id,fighterId:b.fighter_id,opponent:b.opponent,community:b.community,result:b.result,score:b.score,platform:b.platform,date:b.battle_date?new Date(b.battle_date).getTime():Date.now(),link:b.link,note:b.note,oppImg:b.opp_img})); DB._battlesSeed=true;
+    DB.posts=(po.data||[]).map(p=>({id:p.id,authorId:p.author_id,text:p.body||'',img:p.img_url||null,poll:p.poll||null,t:p.created_at?new Date(p.created_at).getTime():Date.now()}));
+    if(ro.data&&ro.data.length) DB.rooms=ro.data.map(r=>({id:r.id,name:r.name,topic:r.topic,accent:r.accent||'#E12B38',regulars:[]}));
+    DB.reactions={}; (re.data||[]).forEach(r=>{ DB.reactions[r.key]=r.data||{}; });
+  }catch(e){ console.warn('content load', e); }
+}
+let _cTimer=null;
+function contentRefresh(){ clearTimeout(_cTimer); _cTimer=setTimeout(async()=>{ await loadContent(); if(me()) render(); }, 400); }
+function subscribeContent(){ if(window._subC||!sb) return; try{ window._subC=sb.channel('content')
+  .on('postgres_changes',{event:'*',schema:'public',table:'posts'},()=>contentRefresh())
+  .on('postgres_changes',{event:'*',schema:'public',table:'battles'},()=>contentRefresh())
+  .on('postgres_changes',{event:'*',schema:'public',table:'events'},()=>contentRefresh())
+  .on('postgres_changes',{event:'*',schema:'public',table:'challenges'},()=>contentRefresh())
+  .on('postgres_changes',{event:'*',schema:'public',table:'rooms'},()=>contentRefresh())
+  .on('postgres_changes',{event:'*',schema:'public',table:'reactions'},()=>contentRefresh())
+  .subscribe(); }catch(e){} }
 /* ======================================================= */
 function onboardChecklist(u){
   if(u._hideChecklist) return '';
@@ -2451,20 +2451,48 @@ window.addEventListener('keydown', e=>{
   else if(e.key==='Escape' && paletteOpen){ closePalette(); }
 });
 /* ---- Stage 2 (not yet wired to Supabase): gate writes so nothing is silently lost ---- */
-function submitPost(){ _soon(); }
-function votePoll(){ _soon(); }
-function deletePost(){ _soon(); }
-function newBattle(){ _soon(); }
-function editBattle(){ _soon(); }
-function saveBattleForm(){ _soon(); }
-function deleteBattle(){ _soon(); }
-function newEvent(){ _soon(); }
-function newChallenge(){ _soon(); }
-function saveEventForm(){ _soon(); }
-function saveChallengeForm(){ _soon(); }
-function deleteEvent(){ editing=null; _soon(); render(); }
-function deleteChallenge(){ editing=null; _soon(); render(); }
-function createRoom(){ _soon(); }
+async function submitPost(){ const u=me(); const d=postDraft; const text=(d.text||'').trim(); let poll=null;
+  if(d.poll){ const opts=d.poll.opts.map(o=>(o||'').trim()).filter(Boolean); if(opts.length>=2) poll={opts:opts.map(t=>({t,votes:[]}))}; }
+  if(!text && !d.img && !poll){ toast('Write something first','bad'); return; }
+  const { error } = await sb.from('posts').insert({ author_id:u.id, body:text, img_url:d.img||null, poll });
+  if(error){ toast('Post failed: '+error.message,'bad'); console.error(error); return; }
+  postDraft={text:'',img:null,poll:null}; awardXP(u,5,'Posted in The Buzz'); await loadContent(); render(); toast('Posted','gold');
+}
+async function votePoll(postId,idx){ const u=me(); const p=(DB.posts||[]).find(x=>x.id===postId); if(!p||!p.poll) return;
+  const had=p.poll.opts[idx].votes.includes(u.id); p.poll.opts.forEach(o=>{ o.votes=o.votes.filter(v=>v!==u.id); }); if(!had) p.poll.opts[idx].votes.push(u.id);
+  render(); const { error } = await sb.from('posts').update({poll:p.poll}).eq('id',postId); if(error) toast('Vote failed: '+error.message,'bad');
+}
+async function deletePost(id){ const u=me(); const p=(DB.posts||[]).find(x=>x.id===id); if(!p) return; if(u.id!==p.authorId && u.role!=='Owner') return; if(!confirm('Delete this post?')) return;
+  const { error } = await sb.from('posts').delete().eq('id',id); if(error){ toast(error.message,'bad'); return; } await loadContent(); render();
+}
+function newBattle(){ editing={kind:'battle', id:null, fighterId:me().id, opponent:'', community:'', result:'Win', score:'', platform:'TikTok', date:Date.now(), link:'', note:'', oppImg:null}; render(); }
+function editBattle(id){ const b=(DB.battles||[]).find(x=>x.id===id); if(!b) return; editing={kind:'battle', id:b.id, fighterId:b.fighterId, opponent:b.opponent, community:b.community, result:b.result, score:b.score, platform:b.platform, date:b.date, link:b.link, note:b.note, oppImg:b.oppImg}; render(); }
+async function saveBattleForm(){ const g=id=>{const e=document.getElementById(id);return e?e.value:'';}; const u=me();
+  const bd=new Date(g('bd_date'));
+  const row={ fighter_id:g('bd_fighter')||u.id, opponent:g('bd_opp').trim()||'Unknown', community:g('bd_comm').trim(), result:g('bd_result')||'Win', score:g('bd_score').trim(), platform:g('bd_plat').trim()||'TikTok', battle_date:isNaN(bd)?new Date().toISOString():bd.toISOString(), link:g('bd_link').trim(), note:g('bd_note').trim(), opp_img:(editing&&editing.oppImg)||null };
+  let res; if(editing.id) res=await sb.from('battles').update(row).eq('id',editing.id); else res=await sb.from('battles').insert(row);
+  if(res.error){ toast('Save failed: '+res.error.message,'bad'); return; }
+  editing=null; await loadContent(); render(); toast('Battle logged','gold');
+}
+async function deleteBattle(id){ if(!confirm('Delete this battle?')) return; const { error } = await sb.from('battles').delete().eq('id',id); if(error){ toast(error.message,'bad'); return; } editing=null; await loadContent(); render(); toast('Battle removed'); }
+function newEvent(){ editing={kind:'event', id:null, title:'', category:'Live', platform:'Discord', starts_at:Date.now()+86400000, reward:120, desc:''}; render(); }
+function newChallenge(){ editing={kind:'challenge', id:null, title:'', desc:'', xp:80, coins:25, badge:''}; render(); }
+async function saveEventForm(){ const g=id=>{const e=document.getElementById(id);return e?e.value:'';};
+  const sd=new Date(g('ed_start')); const starts=isNaN(sd)?new Date(Date.now()+86400000).toISOString():sd.toISOString();
+  const row={ title:g('ed_title').trim()||'Mission', category:g('ed_cat'), platform:g('ed_plat'), starts_at:starts, reward:parseInt(g('ed_reward'))||120, descr:g('ed_desc').trim() };
+  let res; if(editing.id) res=await sb.from('events').update(row).eq('id',editing.id); else res=await sb.from('events').insert(row);
+  if(res.error){ toast('Save failed: '+res.error.message,'bad'); return; }
+  editing=null; await loadContent(); render(); toast('Mission saved','gold');
+}
+async function saveChallengeForm(){ const g=id=>{const e=document.getElementById(id);return e?e.value:'';};
+  const row={ title:g('cd_title').trim()||'Drill', descr:g('cd_desc').trim(), xp:parseInt(g('cd_xp'))||80, coins:parseInt(g('cd_coins'))||25, badge:g('cd_badge')||null };
+  let res; if(editing.id) res=await sb.from('challenges').update(row).eq('id',editing.id); else res=await sb.from('challenges').insert(row);
+  if(res.error){ toast('Save failed: '+res.error.message,'bad'); return; }
+  editing=null; await loadContent(); render(); toast('Drill saved','gold');
+}
+async function deleteEvent(id){ if(!confirm('Delete this mission?')) return; const { error } = await sb.from('events').delete().eq('id',id); if(error){ toast(error.message,'bad'); return; } editing=null; await loadContent(); render(); toast('Mission deleted'); }
+async function deleteChallenge(id){ if(!confirm('Delete this drill?')) return; const { error } = await sb.from('challenges').delete().eq('id',id); if(error){ toast(error.message,'bad'); return; } editing=null; await loadContent(); render(); toast('Drill deleted'); }
+async function createRoom(){ const name=(prompt('Name your room')||'').trim(); if(!name) return; const topic=(prompt('One-line topic (optional)')||'').trim(); const accents=['#E12B38','#2563EB','#FFC83D','#16A34A','#FF3D9A']; const { error } = await sb.from('rooms').insert({name, topic:topic||'A new room in the House.', accent:accents[(DB.rooms||[]).length%accents.length]}); if(error){ toast('Failed: '+error.message,'bad'); return; } await loadContent(); render(); toast('Channel created','gold'); }
 function uploadPic(input, kind){
   const file=input&&input.files&&input.files[0]; if(!file) return;
   if(!/^image\//.test(file.type)){ toast('Pick an image file','bad'); return; }
@@ -2494,13 +2522,27 @@ function uploadPic(input, kind){
   reader.onerror=()=>toast('Upload failed','bad');
   reader.readAsDataURL(file);
 }
-function uploadPostImg(){ _soon(); }
-function uploadOpp(){ _soon(); }
-function reactFeed(){ _soon(); }
-function sendMessage(){ _soon(); }
-function sendNudge(){ _soon(); }
-function nudgeAllBehind(){ _soon(); }
-function importData(){ _soon(); }
+function uploadPostImg(input){ const file=input&&input.files&&input.files[0]; if(!file) return; if(!/^image\//.test(file.type)){ toast('Pick an image','bad'); return; }
+  const r=new FileReader(); r.onload=e=>{ const img=new Image(); img.onload=()=>{ try{
+    const mw=900, sc=Math.min(1,mw/img.width), w=Math.round(img.width*sc), h=Math.round(img.height*sc);
+    const cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h);
+    cv.toBlob(async (blob)=>{ if(!blob) return; const u=me(); const path=u.id+'/post_'+Date.now()+'.jpg'; toast('Uploading\u2026');
+      const up=await sb.storage.from('media').upload(path, blob, {contentType:'image/jpeg',upsert:true}); if(up.error){ toast('Upload failed: '+up.error.message,'bad'); return; }
+      postDraft.img=sb.storage.from('media').getPublicUrl(path).data.publicUrl; render();
+    }, 'image/jpeg', 0.8);
+  }catch(err){ toast('Could not process image','bad'); } }; img.src=e.target.result; }; r.readAsDataURL(file); }
+function uploadOpp(input){ const file=input&&input.files&&input.files[0]; if(!file) return; if(!/^image\//.test(file.type)){ toast('Pick an image','bad'); return; }
+  const r=new FileReader(); r.onload=e=>{ const img=new Image(); img.onload=()=>{ try{
+    const cv=document.createElement('canvas'); cv.width=128; cv.height=128; const ctx=cv.getContext('2d'); const s=Math.max(128/img.width,128/img.height),dw=img.width*s,dh=img.height*s; ctx.drawImage(img,(128-dw)/2,(128-dh)/2,dw,dh);
+    cv.toBlob(async (blob)=>{ if(!blob) return; const u=me(); const path=u.id+'/opp_'+Date.now()+'.jpg'; if(typeof snapBattleForm==='function') snapBattleForm(); toast('Uploading\u2026');
+      const up=await sb.storage.from('media').upload(path, blob, {contentType:'image/jpeg',upsert:true}); if(up.error){ toast('Upload failed: '+up.error.message,'bad'); return; }
+      editing.oppImg=sb.storage.from('media').getPublicUrl(path).data.publicUrl; render();
+    }, 'image/jpeg', 0.8);
+  }catch(err){ toast('Could not process image','bad'); } }; img.src=e.target.result; }; r.readAsDataURL(file); }
+async function reactFeed(key,kind){ DB.reactions=DB.reactions||{}; const r=DB.reactions[key]=DB.reactions[key]||{}; r[kind]=(r[kind]||0)+1; render(); const { error } = await sb.from('reactions').upsert({key, data:r}); if(error) console.warn('react', error.message); }
+function sendMessage(id){ const m=DB.members.find(x=>x.id===id); if(!m) return; const msg=(prompt('Message to '+m.username+':')||'').trim(); if(!msg) return; m.inbox=m.inbox||[]; m.inbox.unshift({id:'m_'+Date.now().toString(36),type:'message',from:(me().username||'Owner'),text:msg,t:Date.now(),read:false}); upsertOther(m); toast('Message sent','gold'); }
+function sendNudge(id){ const m=DB.members.find(x=>x.id===id); if(!m) return; m.inbox=m.inbox||[]; m.inbox.unshift({id:'n_'+Date.now().toString(36),type:'nudge',from:'HQ',text:'Time to morph in \u2014 your squad needs you. \u26A1',t:Date.now(),read:false}); upsertOther(m); toast('Nudge sent to '+m.username,'gold'); }
+function nudgeAllBehind(){ const tk=(typeof todayKey==='function')?todayKey():null; let n=0; DB.members.forEach(m=>{ if(m.last_checkin!==tk){ m.inbox=m.inbox||[]; m.inbox.unshift({id:'n_'+Date.now().toString(36)+Math.floor(Math.random()*999),type:'nudge',from:'HQ',text:'Morph in today to keep your streak alive! \u26A1',t:Date.now(),read:false}); upsertOther(m); n++; } }); toast('Nudged '+n+' rangers','gold'); }
 function resetAll(){ toast('Manage data from the Supabase dashboard now','bad'); }
 
 boot();

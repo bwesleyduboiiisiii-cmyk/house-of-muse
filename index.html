@@ -199,7 +199,7 @@ let DB = load();
 const SUPA_URL='https://abtmfykiwfrvliuplnij.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFidG1meWtpd2ZydmxpdXBsbmlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3ODM4ODUsImV4cCI6MjA5ODM1OTg4NX0.TGuXfgRRjgwA_nCl8FxMvG2nMeguWiMlE2aBjn2g7qc';
 const sb = (window.supabase ? window.supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}) : null);
-var AUTHVIEW='signin', pendingAuthUser=null, _saveTimer=null, _profLoading=false;
+var AUTHVIEW='signin', AUTHMODE='signin', pendingAuthUser=null, _saveTimer=null, _profLoading=false;
 function _soon(){ toast('That goes live in the next update \u2014 Stage 1 is accounts + your progress','bad'); }
 function rowToMember(r){ const p=r.prefs||{};
   return { id:r.id, username:r.username||'Ranger', tiktok:r.tiktok||'', discord:r.discord||'', bio:r.bio||'',
@@ -245,15 +245,35 @@ async function refetchProfiles(){ if(!sb) return; let res; try{ res=await sb.fro
   if(me()) render();
 }
 function subscribeProfiles(){ if(window._sub||!sb) return; try{ window._sub=sb.channel('pf').on('postgres_changes',{event:'*',schema:'public',table:'profiles'},()=>refetchProfiles()).subscribe(); }catch(e){} }
-async function sendMagic(){ const el=document.getElementById('auth_email'); const email=((el&&el.value)||'').trim();
-  if(!/.+@.+\..+/.test(email)){ toast('Enter a valid email','bad'); return; }
+var AUTH_DOMAIN='houseofmuse.app';
+function _authEmail(name){ return name.toLowerCase().replace(/[^a-z0-9._-]/g,'')+'@'+AUTH_DOMAIN; }
+function _authPass(code){ return 'pin:'+code+':muse-hub'; }
+async function enterHouse(){
+  const name=(document.getElementById('auth_user').value||'').trim();
+  const code=(document.getElementById('auth_code').value||'').trim();
+  if(name.length<2){ toast('Enter your callsign','bad'); return; }
+  if(!/^\d{4}$/.test(code)){ toast('Enter your 4-digit code','bad'); return; }
   if(!sb){ toast('Supabase not loaded','bad'); return; }
-  const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: window.location.href.split('#')[0] } });
-  if(error){ toast(error.message,'bad'); return; }
-  AUTHVIEW='sent'; viewLogin();
+  const btn=document.getElementById('auth_go'); if(btn){ btn.disabled=true; btn.textContent='Entering\u2026'; }
+  const { error } = await sb.auth.signInWithPassword({ email:_authEmail(name), password:_authPass(code) });
+  if(error){ if(btn){ btn.disabled=false; btn.textContent='Enter the House \u26A1'; } toast('Callsign or code not found. New here? Tap \u201CCreate one\u201D.','bad'); }
+}
+async function createAccount(){
+  const name=(document.getElementById('auth_user').value||'').trim();
+  const code=(document.getElementById('auth_code').value||'').trim();
+  if(name.length<2){ toast('Pick a callsign (2+ characters)','bad'); return; }
+  if(!/^[a-zA-Z0-9._-]+$/.test(name)){ toast('Letters, numbers, . _ - only','bad'); return; }
+  if(!/^\d{4}$/.test(code)){ toast('Pick a 4-digit code','bad'); return; }
+  if(!sb){ toast('Supabase not loaded','bad'); return; }
+  const btn=document.getElementById('auth_go'); if(btn){ btn.disabled=true; btn.textContent='Creating\u2026'; }
+  window._signupName=name;
+  const { data, error } = await sb.auth.signUp({ email:_authEmail(name), password:_authPass(code) });
+  if(error){ if(btn){ btn.disabled=false; btn.textContent='Create my callsign \u26A1'; }
+    if(/registered|already|exists/i.test(error.message)){ toast('That callsign is taken \u2014 sign in instead.','bad'); AUTHMODE='signin'; viewLogin(); } else toast(error.message,'bad'); return; }
+  if(!data.session){ if(btn){ btn.disabled=false; btn.textContent='Create my callsign \u26A1'; } toast('Owner: turn OFF \u201CConfirm email\u201D in Supabase \u2192 Authentication \u2192 Email.','bad'); }
 }
 async function createRanger(){
-  const u=(document.getElementById('f_user').value||'').trim();
+  const fu=document.getElementById('f_user'); const u=(window._signupName||(fu&&fu.value)||'').trim();
   if(u.length<2){ toast('Pick a callsign with at least 2 characters','bad'); return; }
   if(DB.members.some(m=>m.username.toLowerCase()===u.toLowerCase())){ toast('That callsign is taken','bad'); return; }
   if(!pickColor||!pickSeries){ toast('Pick your Ranger color and team','bad'); return; }
@@ -273,7 +293,7 @@ async function boot(){
   if(!sb){ document.getElementById('app').innerHTML='<div style=\'padding:48px;color:#F4F1EA;font-family:sans-serif;text-align:center\'>Could not load Supabase. Check your connection and refresh.</div>'; return; }
   let session=null; try{ const r=await sb.auth.getSession(); session=r.data.session; }catch(e){ console.error(e); }
   if(session && session.user){ await loadProfiles(session.user); }
-  else { DB.currentUserId=null; AUTHVIEW='signin'; viewLogin(); }
+  else { DB.currentUserId=null; AUTHVIEW='signin'; AUTHMODE='signin'; viewLogin(); }
 }
 if(sb){ sb.auth.onAuthStateChange((evt,session)=>{
   if((evt==='SIGNED_IN'||evt==='INITIAL_SESSION') && session && session.user){ loadProfiles(session.user); }
@@ -698,7 +718,9 @@ function renderAuth(mode){
   if(view==='onboard'){
     box.innerHTML = `<div class="bg-panel/70 border border-orchid/30 rounded-2xl p-5 sm:p-6 ring-soft" style="box-shadow:0 0 0 1px rgba(225,43,56,.12),0 18px 50px -22px rgba(225,43,56,.45)">
       <div class="text-[11px] uppercase tracking-[.2em] text-gold/80 mb-3">✨ Create your ranger</div>
-      ${field('Callsign','required',person,'f_user','Pick the callsign the squad will know you by')}
+      <label class="block text-[11px] tracking-[.12em] uppercase text-chalk/90 mb-1.5">Callsign</label>
+      <div class="relative mb-4"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-steel">${person}</span>
+        <input value="${esc(window._signupName||'')}" readonly class="w-full bg-raised/40 border border-line rounded-xl pl-10 pr-3 py-3 text-sm text-silver outline-none"/></div>
       ${field('TikTok Handle','optional',tiktok,'f_tt','@ yourhandle')}
       ${field('Your Specialty','optional',star,'f_bio','Editor, designer, producer…')}
       <label class="block text-[11px] tracking-[.12em] uppercase text-chalk/90 mb-2">Choose Your Ranger <span class="text-steel/70 normal-case tracking-normal">— color + team</span></label>
@@ -709,11 +731,17 @@ function renderAuth(mode){
     renderRangerPicker('signup');
     return;
   }
+  const isCreate = AUTHMODE==='create';
+  const lock = `<svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`;
   box.innerHTML = `<div class="bg-panel/70 border border-line rounded-2xl p-5 sm:p-6 ring-soft" style="box-shadow:0 0 0 1px rgba(225,43,56,.10),0 18px 50px -22px rgba(225,43,56,.4)">
-      <div class="text-[11px] uppercase tracking-[.2em] text-gold/80 mb-3">Sign in to the House</div>
-      ${field('Your email','required','✉️','auth_email','you@email.com','email')}
-      <button onclick="sendMagic()" class="sheen w-full py-3.5 rounded-xl font-bold tracking-wide text-ink bg-gradient-to-b from-[#ff5a4d] to-orchid hover:brightness-110 transition text-base">Send my sign-in link ⚡</button>
-      <p class="text-[11px] text-steel mt-4 leading-relaxed">New or returning — same link, no password. First time in, you’ll pick your ranger.</p>
+      <div class="text-[11px] uppercase tracking-[.2em] text-gold/80 mb-3">${isCreate?'Create your callsign':'Enter the House'}</div>
+      ${field('Callsign','required',person,'auth_user','yourname')}
+      <label class="block text-[11px] tracking-[.12em] uppercase text-chalk/90 mb-1.5">4-digit code <span class="text-steel/70 lowercase tracking-normal">(${isCreate?'pick one you’ll remember':'required'})</span></label>
+      <div class="relative mb-4"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-steel">${lock}</span>
+        <input id="auth_code" type="tel" inputmode="numeric" maxlength="4" pattern="[0-9]*" placeholder="••••" onkeydown="if(event.key==='Enter'){${isCreate?'createAccount':'enterHouse'}()}" class="w-full bg-raised/70 border border-line rounded-xl pl-10 pr-3 py-3 text-base text-chalk tracking-[.5em] placeholder:tracking-[.5em] placeholder:text-steel/60 focus:border-orchid outline-none"/></div>
+      <button id="auth_go" onclick="${isCreate?'createAccount()':'enterHouse()'}" class="sheen w-full py-3.5 rounded-xl font-bold tracking-wide text-ink bg-gradient-to-b from-[#ff5a4d] to-orchid hover:brightness-110 transition text-base">${isCreate?'Create my callsign ⚡':'Enter the House ⚡'}</button>
+      <button onclick="AUTHMODE='${isCreate?'signin':'create'}';viewLogin()" class="mt-4 w-full text-center text-[12px] text-orchid hover:underline">${isCreate?'Already have a callsign? Sign in':'New here? Create one'}</button>
+      <p class="text-[11px] text-steel mt-3 leading-relaxed">${isCreate?'Your callsign + code is your login — no email, ever. First time in, you’ll pick your ranger.':'Use the callsign and 4-digit code you made. Forgot it? Ask the owner.'}</p>
     </div>`;
 }
 function quickFill(name){ const f=document.getElementById('f_user'); if(f) f.value=name; }

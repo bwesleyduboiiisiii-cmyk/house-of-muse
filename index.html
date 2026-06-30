@@ -382,7 +382,7 @@ function seed(){
   );
   const members = [
     mk('RED_LEADER','@morphsquad','leader','Red. Motion + edits. First to suit up, last to stand down. Runs the op.',9120,1840,21,58,'Owner',96,['day_one','max_power','quartermaster','mission_mvp']),
-    mk('BlueByte','@bluebyte','blue','Blue. Code and clean cuts \u2014 the calm in every mission.',6740,1210,14,40,'Moderator',88,['wingman','power_streak','mission_mvp','team_up']),
+    mk('BlueByte','@bluebyte','blue','Blue. Code and clean cuts \u2014 the calm in every mission.',6740,1210,14,40,'Manager',88,['wingman','power_streak','mission_mvp','team_up']),
     mk('GoldRush','@goldrush','gold','Yellow. Designer with a deadline addiction.',5210,980,9,33,'Member',70,['mission_mvp','power_streak','team_up']),
     mk('GreenMachine','@greenmachine','green','Green. 3D + motion, building something every weekend.',4480,860,11,29,'Member',64,['power_streak','quartermaster','first_morph']),
     mk('NightHawk','@nighthawk','hawk','Black. Photographer \u2014 shoots the city after everyone leaves.',3920,640,6,24,'Member',52,['team_up','first_morph']),
@@ -573,7 +573,7 @@ function sidebar(){
       ${un?`<span class="ml-auto text-[10px] font-bold bg-rose text-ink rounded-full px-1.5 min-w-[18px] text-center">${un}</span>`:''}
     </button>`; };
   const links = order.map(item).join('');
-  const admin = (u.role==='Owner'||u.role==='Moderator')
+  const admin = (u.role==='Owner'||u.role==='Manager')
     ? `<button onclick="route('admin')" aria-label="Command" class="relative w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-left text-[14px] transition ${ROUTE==='admin'?'text-chalk font-semibold':'text-silver hover:text-chalk hover:bg-raised/50'}" ${ROUTE==='admin'?"style='background:linear-gradient(90deg,rgba(255,200,61,.18),transparent);box-shadow:inset 0 0 0 1px rgba(255,200,61,.35)'":""}><span class="w-[18px] h-[18px] ${ROUTE==='admin'?'text-gold':'text-steel'}">${ICON.crown}</span>Command</button>` : '';
   const dots = DB.members.slice(0,10).map(m=>`<span class="w-5 h-5 rounded-full" title="${esc(m.username)}" style="background:radial-gradient(circle at 35% 28%, #ffffffaa, ${colorHex(m.color)} 42%, #00000088);box-shadow:0 0 0 1px rgba(255,255,255,.12), 0 0 8px -2px ${colorHex(m.color)}"></span>`).join('');
   const EMB = `<svg viewBox="0 0 120 152" width="58" height="74" aria-hidden="true" style="filter:drop-shadow(0 0 12px rgba(225,43,56,.6))"><path d="M26 42 L33 15 L46 33 L60 8 L74 33 L87 15 L94 42 Z" fill="#E12B38"/><rect x="26" y="42" width="68" height="8" rx="2.5" fill="#E12B38"/><circle cx="60" cy="101" r="40" fill="none" stroke="#E12B38" stroke-width="6.5"/><path d="M67 73 L47 106 L58 106 L53 130 L75 95 L63 95 Z" fill="#E12B38"/></svg>`;
@@ -597,7 +597,7 @@ function sidebar(){
 }
 function topbar(){
   const u=me();
-  const all = NAV.slice(); if(u.role==='Owner'||u.role==='Moderator') all.push(['admin','Command','crown']);
+  const all = NAV.slice(); if(u.role==='Owner'||u.role==='Manager') all.push(['admin','Command','crown']);
   const tabs = all.map(([id,label,ic])=>`<button onclick="route('${id}')" class="px-3 py-1.5 rounded-lg text-xs whitespace-nowrap ${ROUTE===id?'text-chalk bg-orchid/20':'text-steel'}">${label}</button>`).join('');
   return `
   <header class="lg:hidden sticky top-0 z-40 glass border-b border-line"><div class="morph-strip"></div>
@@ -987,6 +987,7 @@ function viewDashboard(){
   const q=QUOTES[hash(todayKey())%QUOTES.length];
 
   app.innerHTML = shell(`
+    ${ownerClaimCard(u)}
     ${onboardingOverlay(u)}
 
     <div class="relative overflow-hidden rounded-2xl border border-line ring-soft mb-5">
@@ -1116,7 +1117,7 @@ function viewSalon(){
   }).join('');
   function salonCard(m){
     const online=hash(m.username+todayKey())%3!==0; const c=colorHex(m.color); const lvl=levelFromXP(m.xp);
-    const crest=m.role==='Owner'?'👑':m.role==='Moderator'?'✦':'';
+    const crest=m.role==='Owner'?'👑':m.role==='Manager'?'✦':'';
     return `<div onclick="openProfile('${m.id}')" class="relative bg-panel rounded-2xl p-4 text-center cursor-pointer hover-lift" style="border:1px solid ${c}44;box-shadow:0 0 0 1px ${c}1f, 0 14px 34px -20px ${c}">
       <span class="absolute top-3 right-3 w-2.5 h-2.5 rounded-full" title="${online?'Active':'Away'}" style="background:${online?'#34d399':'#4b5563'}"></span>
       ${crest?`<div class="absolute top-2.5 left-3 text-sm" style="color:${c}">${crest}</div>`:''}
@@ -1274,7 +1275,7 @@ function deleteBattle(id){ if(!confirm('Delete this battle from the log?')) retu
 function editorOverlay(){
   if(!editing) return '';
   const u=me();
-  if(editing.kind!=='battle' && u.role!=='Owner') return '';
+  if(editing.kind!=='battle' && u.role!=='Owner' && u.role!=='Manager') return '';
   if(editing.kind==='battle' && !(u.role==='Owner' || editing.fighterId===u.id)) return '';
   const IN='w-full bg-raised border border-line rounded-lg px-3 py-2 text-sm text-chalk focus:border-orchid outline-none';
   const lab=t=>`<label class="block text-[11px] uppercase tracking-wide text-steel mb-1">${t}</label>`;
@@ -1344,12 +1345,12 @@ function countdown(ts){
   return day>0?`${day}d ${h}h`:h>0?`${h}h ${m}m`:`${m}m`;
 }
 function viewEvents(){
-  const u=me(); const isOwner=u.role==='Owner';
+  const u=me(); const isOwner=u.role==='Owner'; const isStaff=isOwner||u.role==='Manager';
   const cats=['all',...Array.from(new Set(DB.events.map(e=>e.category)))];
   let list=[...DB.events].sort((a,b)=>a.starts_at-b.starts_at);
   if(evFilter!=='all') list=list.filter(e=>e.category===evFilter);
   const feat=[...DB.events].sort((a,b)=>a.starts_at-b.starts_at)[0];
-  const newBtn=isOwner?`<button onclick="newEvent()" class="text-xs px-3 py-1.5 rounded-lg bg-gold/20 text-gold hover:bg-gold/30 font-semibold">+ New mission</button>`:'';
+  const newBtn=isStaff?`<button onclick="newEvent()" class="text-xs px-3 py-1.5 rounded-lg bg-gold/20 text-gold hover:bg-gold/30 font-semibold">+ New mission</button>`:'';
   const cards=list.map(e=>{
     const c=ACC[e.category]||ACC.Other; const going=u.rsvps.includes(e.id);
     const d=new Date(e.starts_at);
@@ -1368,7 +1369,7 @@ function viewEvents(){
           <div class="flex items-center">${stack}<span class="text-[11px] text-steel ml-2">+${DB.members.length-4} going</span></div>
           <button onclick="rsvp('${e.id}')" class="text-xs px-3 py-1.5 rounded-lg ${going?'bg-gold/20 text-gold':'bg-orchid/20 text-orchid hover:bg-orchid/30'}">${going?'\u2713 Going':'RSVP · +'+e.reward}</button>
         </div>
-        ${isOwner?`<div class="flex gap-2 mt-3 pt-3 border-t border-line"><button onclick="editEvent('${e.id}')" class="text-[11px] px-2.5 py-1 rounded-md bg-raised border border-line text-steel hover:text-chalk">Edit</button><button onclick="deleteEvent('${e.id}')" class="text-[11px] px-2.5 py-1 rounded-md bg-raised border border-line text-steel hover:text-rose">Delete</button></div>`:''}
+        ${isStaff?`<div class="flex gap-2 mt-3 pt-3 border-t border-line"><button onclick="editEvent('${e.id}')" class="text-[11px] px-2.5 py-1 rounded-md bg-raised border border-line text-steel hover:text-chalk">Edit</button><button onclick="deleteEvent('${e.id}')" class="text-[11px] px-2.5 py-1 rounded-md bg-raised border border-line text-steel hover:text-rose">Delete</button></div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -1391,7 +1392,7 @@ function viewEvents(){
 
 /* ---------- CHALLENGES ---------- */
 function viewChallenges(){
-  const u=me(); const isOwner=u.role==='Owner';
+  const u=me(); const isOwner=u.role==='Owner'; const isStaff=isOwner||u.role==='Manager';
   const total=DB.challenges.length, done=DB.challenges.filter(c=>u.done.includes(c.id)).length;
   const pct=total?Math.round(done/total*100):0;
   const days=Math.max(0,Math.ceil((DB.season.ends-Date.now())/86400000));
@@ -1415,7 +1416,7 @@ function viewChallenges(){
           : isPending?`<div class="shrink-0 text-[10px] leading-tight px-2 py-1.5 rounded-lg bg-orchid/15 text-orchid text-center">Pending<br>review</div>`
           : `<button onclick="completeChallenge('${c.id}')" aria-label="Complete ${esc(c.title)}" class="shrink-0 w-10 h-10 rounded-full grid place-items-center bg-raised border border-line text-steel hover:border-orchid hover:text-orchid">${ICON.check.replace('w-full h-full','w-5 h-5')}</button>`}
       </div>
-      ${isOwner?`<div class="flex gap-2 mt-3 pt-3 border-t border-line"><button onclick="editChallenge('${c.id}')" class="text-[11px] px-2.5 py-1 rounded-md bg-raised border border-line text-steel hover:text-chalk">Edit</button><button onclick="deleteChallenge('${c.id}')" class="text-[11px] px-2.5 py-1 rounded-md bg-raised border border-line text-steel hover:text-rose">Delete</button></div>`:''}
+      ${isStaff?`<div class="flex gap-2 mt-3 pt-3 border-t border-line"><button onclick="editChallenge('${c.id}')" class="text-[11px] px-2.5 py-1 rounded-md bg-raised border border-line text-steel hover:text-chalk">Edit</button><button onclick="deleteChallenge('${c.id}')" class="text-[11px] px-2.5 py-1 rounded-md bg-raised border border-line text-steel hover:text-rose">Delete</button></div>`:''}
     </div>`;
   }).join('');
   app.innerHTML = shell(`
@@ -1424,7 +1425,7 @@ function viewChallenges(){
       <div class="flex items-center justify-between mb-2"><span class="text-sm text-chalk">${done} of ${total} complete</span><span class="text-[12px] text-steel">resets in ${days} days</span></div>
       <div class="h-2.5 rounded-full bar-bg overflow-hidden"><div class="h-full rounded-full bg-gradient-to-r from-orchid to-gold transition-all" style="width:${pct}%"></div></div>
     </div>
-    ${isOwner?`<div class="flex justify-end mb-4"><button onclick="newChallenge()" class="text-xs px-3 py-1.5 rounded-lg bg-gold/20 text-gold hover:bg-gold/30 font-semibold">+ New drill</button></div>`:''}
+    ${isStaff?`<div class="flex justify-end mb-4"><button onclick="newChallenge()" class="text-xs px-3 py-1.5 rounded-lg bg-gold/20 text-gold hover:bg-gold/30 font-semibold">+ New drill</button></div>`:''}
     ${cards?`<div class="grid sm:grid-cols-2 gap-3">${cards}</div>`:`<div class="text-sm text-steel py-10 text-center">No drills yet.${isOwner?' Tap \u201C+ New drill\u201D to add one.':''}</div>`}
     ${editorOverlay()}
     ${footerLine()}
@@ -1616,8 +1617,8 @@ function togglePref(k){ const u=me(); u.prefs=u.prefs||{}; u.prefs[k]=!u.prefs[k
 /* ---------- ADMIN ---------- */
 function viewAdmin(){
   const u=me();
-  if(u.role!=='Owner'&&u.role!=='Moderator'){ ROUTE='dashboard'; return viewDashboard(); }
-  const isOwner=u.role==='Owner';
+  if(u.role!=='Owner'&&u.role!=='Manager'){ ROUTE='dashboard'; return viewDashboard(); }
+  const isOwner=u.role==='Owner'; const isStaff=isOwner||u.role==='Manager';
   const behind=DB.members.filter(m=>m.id!==u.id && memberStatus(m).label!=='On track').length;
   const activeToday=DB.members.filter(m=>daysSinceCheckin(m)===0).length;
   const trainTotal=DB.challenges.length;
@@ -1635,7 +1636,7 @@ function viewAdmin(){
         ${me_?'<span class="text-steel/40 text-[11px]">you</span>':`
           <button onclick="sendNudge('${m.id}')" title="Send a check-in reminder" class="text-[11px] px-2 py-1 rounded bg-gold/15 text-gold hover:bg-gold/25">Nudge</button>
           <button onclick="sendMessage('${m.id}')" title="Send a message" class="text-[11px] px-2 py-1 rounded bg-orchid/15 text-orchid hover:bg-orchid/25">Message</button>
-          ${isOwner?`<button onclick="bump('${m.id}')" title="Grant +250 Power" class="text-[11px] px-2 py-1 rounded bg-raised text-steel hover:text-chalk">+250</button><button onclick="giveEnergy('${m.id}')" title="Grant +100 Energy" class="text-[11px] px-2 py-1 rounded bg-gold/15 text-gold hover:bg-gold/25">+100⚡</button>`:''}
+          ${isOwner?`<button onclick="bump('${m.id}')" title="Grant +250 Power" class="text-[11px] px-2 py-1 rounded bg-raised text-steel hover:text-chalk">+250</button><button onclick="giveEnergy('${m.id}')" title="Grant +100 Energy" class="text-[11px] px-2 py-1 rounded bg-gold/15 text-gold hover:bg-gold/25">+100⚡</button>`:''}${isOwner?`<select onchange="setRole('${m.id}',this.value)" title="Set role" class="ml-1 align-middle text-[11px] bg-raised border border-line rounded px-1.5 py-1 text-chalk focus:border-orchid outline-none"><option value="Member"${m.role==='Member'?' selected':''}>Member</option><option value="Manager"${m.role==='Manager'?' selected':''}>Manager</option><option value="Owner"${m.role==='Owner'?' selected':''}>Owner</option></select>`:''}
         `}
       </td>
     </tr>`;
@@ -1665,7 +1666,7 @@ function viewAdmin(){
       <div class="min-w-0 flex-1"><div class="text-[13px] text-chalk">${esc(m.username)} <span class="text-steel">submitted</span> <span class="text-silver">${esc(p.title||p.ref||'a task')}</span> <span class="text-[10px] px-1.5 py-0.5 rounded ${p.kind==='quest'?'bg-orchid/15 text-orchid':'bg-gold/15 text-gold'}">${p.kind==='quest'?'Quest':'Drill'}</span></div>
       <div class="text-[11px] text-steel">${timeAgo(p.t)} \u00b7 +${p.xp||0} Power${p.coins?', +'+p.coins+' Energy':''}</div>
       ${p.note?`<div class="text-[12px] text-silver mt-1.5 p-2 rounded-lg bg-raised border border-line">\u201C${esc(p.note)}\u201D</div>`:`<div class="text-[11px] text-steel/60 mt-1">No proof note attached</div>`}</div>
-      ${isOwner?`<div class="flex flex-col gap-2 shrink-0"><button onclick="approveSubmission('${m.id}','${p.pid}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30">Approve</button><button onclick="declineSubmission('${m.id}','${p.pid}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-rose/15 text-rose hover:bg-rose/25">Decline</button></div>`:'<span class="text-[11px] text-steel shrink-0">owner reviews</span>'}
+      ${isStaff?`<div class="flex flex-col gap-2 shrink-0"><button onclick="approveSubmission('${m.id}','${p.pid}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30">Approve</button><button onclick="declineSubmission('${m.id}','${p.pid}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-rose/15 text-rose hover:bg-rose/25">Decline</button></div>`:'<span class="text-[11px] text-steel shrink-0">owner reviews</span>'}
     </div>`; }).join('') : `<div class="text-sm text-steel py-10 text-center">No submissions waiting \u2014 the squad\u2019s all caught up. \uD83C\uDF89</div>`;
   const tab=(id,label)=>`<button onclick="adminView='${id}';render()" class="px-3 py-1.5 rounded-lg text-xs ${adminView===id?'tab-on':'bg-raised text-steel'}">${label}</button>`;
 
@@ -1769,6 +1770,9 @@ function saveProfile(){
 }
 function giveEnergy(id){ const m=DB.members.find(x=>x.id===id); if(!m) return; awardCoins(m,100,'Owner grant'); m.feed=m.feed||[]; m.feed.unshift({g:'\u26A1', title:'Received 100 Energy', sub:'Granted by the owner', t:Date.now()}); upsertOther(m); render(); toast('+100 Energy to '+m.username,'gold'); }
 function bump(id){ const m=DB.members.find(x=>x.id===id); if(!m) return; awardXP(m,250,'Owner grant'); upsertOther(m); render(); toast('+250 Power to '+m.username,'gold'); }
+function setRole(id,role){ const u=me(); if(!u||u.role!=='Owner'){ toast('Only the Owner can set roles','bad'); render(); return; } const m=DB.members.find(x=>x.id===id); if(!m) return; if(!['Owner','Manager','Member'].includes(role)){ render(); return; } if(m.role==='Owner' && role!=='Owner' && DB.members.filter(x=>x.role==='Owner').length<=1){ toast('Promote another Owner before stepping anyone down','bad'); render(); return; } m.role=role; (m.id===u.id?upsertProfile:upsertOther)(m); pushInbox(id,'message',`Your role is now ${role}.`); if(m.id!==u.id) upsertOther(m); render(); toast(`${m.username} is now ${role}`,'gold'); }
+function claimFounder(){ const u=me(); if(!u) return; if(DB.members.some(m=>m.role==='Owner')){ toast('There’s already an Owner','bad'); render(); return; } u.role='Owner'; upsertProfile(u); render(); toast('You’re the Owner now — welcome, Commander ⚡','gold'); }
+function ownerClaimCard(u){ if(!u || DB.members.some(m=>m.role==='Owner')) return ''; return `<div class="rounded-2xl border border-gold/40 bg-gold/10 p-4 mb-5 flex items-center justify-between gap-3 flex-wrap"><div class="min-w-0"><div class="font-display text-lg text-gold">No Owner yet</div><div class="text-[12px] text-silver">Claim ownership to lead the House — you’ll assign roles and approve submissions.</div></div><button onclick="claimFounder()" class="shrink-0 text-sm px-4 py-2 rounded-xl font-bold text-ink bg-gradient-to-b from-[#ffd86b] to-gold hover:brightness-110">Claim Owner ⚡</button></div>`; }
 function resetAll(){ if(confirm('Reset all demo data and seed fresh? This clears your account too.')){ DB=seed(); save(); render(); } }
 
 /* ---------- LIVE ROOMS (Jitsi-powered audio/video) ---------- */
@@ -2166,7 +2170,7 @@ function viewInbox(){
   `);
 }
 function viewBattles(){
-  const u=me(); const isOwner=u.role==='Owner';
+  const u=me(); const isOwner=u.role==='Owner'; const isStaff=isOwner||u.role==='Manager';
   DB.battles=DB.battles||[];
   if(!DB._battlesSeed){ DB._battlesSeed=true;
     if(!DB.battles.length && DB.members.length){

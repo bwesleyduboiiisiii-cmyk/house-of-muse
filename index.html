@@ -1340,16 +1340,17 @@ function attendanceOverlay(){ if(!attnBattle) return ''; const b=(DB.battles||[]
 function openSchedule(){ scheduleOpen=true; render(); setTimeout(()=>{ const d=document.getElementById('sch_date'); if(d&&!d.value){ d.value=new Date().toISOString().slice(0,10); } const o=document.getElementById('sch_opp'); if(o) o.focus(); },0); }
 function closeSchedule(){ scheduleOpen=false; render(); }
 async function addScheduled(){ const g=id=>{const e=document.getElementById(id);return e?e.value:'';};
-  const opp=g('sch_opp').trim(); if(!opp){ toast('Enter an opponent','bad'); return; }
+  const opp=g('sch_opp').trim(); if(!opp){ toast('Enter the opponent username','bad'); return; }
   const dateStr=g('sch_date'), timeStr=g('sch_time')||'20:00';
   if(!dateStr){ toast('Pick a date','bad'); return; }
   const when=new Date(dateStr+'T'+timeStr); if(isNaN(when)){ toast('Check the date and time','bad'); return; }
-  const row={ fighter_id:g('sch_fighter')||me().id, opponent:opp, community:'', result:'Scheduled', score:'', platform:g('sch_plat').trim()||'TikTok', battle_date:when.toISOString(), link:'', note:'', opp_img:null };
+  const pow=g('sch_pow').trim();
+  const row={ fighter_id:g('sch_fighter')||me().id, opponent:opp, community:g('sch_agency').trim(), result:'Scheduled', score:'', platform:'TikTok', battle_date:when.toISOString(), link:'', note:pow?('Power-Ups: '+pow):'', opp_img:null };
   const btn=document.getElementById('sch_add'); if(btn){ btn.disabled=true; btn.textContent='Adding\u2026'; }
   const { error } = await sb.from('battles').insert(row);
   if(error){ toast('Could not add: '+error.message,'bad'); if(btn){ btn.disabled=false; btn.textContent='Add to schedule'; } return; }
   await loadContent(); toast('Added to the schedule \u26A1','gold'); scheduleOpen=true; render();
-  setTimeout(()=>{ const o=document.getElementById('sch_opp'); if(o) o.focus(); },0);
+  setTimeout(()=>{ const a=document.getElementById('sch_agency'); if(a) a.focus(); },0);
 }
 async function importSchedule(){ const ta=document.getElementById('sch_bulk'); const raw=(ta&&ta.value||'').trim(); if(!raw){ toast('Paste your schedule first','bad'); return; }
   const fsel=document.getElementById('sch_fighter'); const fid=(fsel&&fsel.value)||me().id;
@@ -1359,7 +1360,7 @@ async function importSchedule(){ const ta=document.getElementById('sch_bulk'); c
     const dm=p[0].match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/); if(!dm) return; const mo=+dm[1], da=+dm[2]; let yr=dm[3]?(+dm[3]<100?2000+ +dm[3]:+dm[3]):now.getFullYear();
     const tm=p[1].match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i); if(!tm) return; let hh=+tm[1]; const mm=+tm[2]; const ap=(tm[3]||'').toUpperCase(); if(ap==='PM'&&hh<12)hh+=12; if(ap==='AM'&&hh===12)hh=0;
     const when=new Date(yr,mo-1,da,hh,mm); if(isNaN(when.getTime())) return;
-    rows.push({ fighter_id:fid, opponent:p[2]||'Unknown', community:'', result:'Scheduled', score:'', platform:'TikTok', battle_date:when.toISOString(), link:'', note:p[3]||'', opp_img:null });
+    rows.push({ fighter_id:fid, opponent:p[2]||'Unknown', community:p[3]||'', result:'Scheduled', score:'', platform:'TikTok', battle_date:when.toISOString(), link:'', note:p[4]?('Power-Ups: '+p[4]):'', opp_img:null });
   });
   if(!rows.length){ toast('Couldn\u2019t read any battles \u2014 check the format','bad'); return; }
   const btn=document.getElementById('sch_import'); if(btn){ btn.disabled=true; btn.textContent='Importing\u2026'; }
@@ -1381,16 +1382,17 @@ function scheduleOverlay(){ if(!scheduleOpen) return '';
       <p class="text-[12px] text-steel mb-4">Punch in your week \u2014 each one drops onto the battle calendar. Add them one after another.</p>
       <div class="grid grid-cols-2 gap-3 mb-3">
         <div class="col-span-2"><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Fighter</label><select id="sch_fighter" class="${IN2}">${opts}</select></div>
-        <div class="col-span-2"><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Opponent</label><input id="sch_opp" placeholder="@rival or crew name" class="${IN2}"></div>
+        <div class="col-span-2"><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Opponent agency</label><input id="sch_agency" placeholder="e.g. rare, pwr" class="${IN2}"></div>
+        <div class="col-span-2"><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Opponent username</label><input id="sch_opp" placeholder="@rival" class="${IN2}"></div>
         <div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Date</label><input id="sch_date" type="date" class="${IN2}"></div>
         <div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Time</label><input id="sch_time" type="time" value="20:00" class="${IN2}"></div>
-        <div class="col-span-2"><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Platform</label><input id="sch_plat" value="TikTok" class="${IN2}"></div>
+        <div class="col-span-2"><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Power-Ups</label><input id="sch_pow" placeholder="e.g. Yes, No, or which ones" class="${IN2}"></div>
       </div>
       <button id="sch_add" onclick="addScheduled()" class="w-full py-3 rounded-xl font-bold text-ink bg-gradient-to-b from-[#ff5a4d] to-orchid hover:brightness-110 mb-4">Add to schedule</button>
       <div class="border-t border-line pt-4 mb-4">
         <div class="text-[11px] uppercase tracking-wide text-steel mb-1">Or paste a whole week</div>
-        <p class="text-[11px] text-steel mb-2">One battle per line: <span class="text-silver">MM/DD | 8:30 PM | opponent | note</span></p>
-        <textarea id="sch_bulk" rows="6" placeholder="07/01 | 8:30 PM | swolemigoking | 20-30K diamonds" class="${IN2} resize-none font-mono text-[12px]"></textarea>
+        <p class="text-[11px] text-steel mb-2">One battle per line: <span class="text-silver">MM/DD | 8:30 PM | opponent | agency | power-ups</span></p>
+        <textarea id="sch_bulk" rows="6" placeholder="07/01 | 8:30 PM | swolemigoking | rare | Yes" class="${IN2} resize-none font-mono text-[12px]"></textarea>
         <button id="sch_import" onclick="importSchedule()" class="w-full mt-2 py-2.5 rounded-xl font-semibold text-chalk bg-raised border border-line hover:border-orchid">Import all</button>
       </div>
       <div class="text-[11px] uppercase tracking-wide text-steel mb-2">Scheduled battles</div>
@@ -2337,7 +2339,7 @@ function viewInbox(){
 function _startOfMonth(ms){ const d=new Date(ms); return new Date(d.getFullYear(), d.getMonth(), 1).getTime(); }
 function _sameDay(a,b){ const x=new Date(a),y=new Date(b); return x.getFullYear()===y.getFullYear()&&x.getMonth()===y.getMonth()&&x.getDate()===y.getDate(); }
 function calEvents(){ const items=[]; const now=Date.now();
-  (DB.battles||[]).forEach(b=>{ const f=DB.members.find(m=>m.id===b.fighterId); items.push({when:b.date, type:'battle', title:(f?f.username:'Ranger')+' vs '+(b.opponent||'?'), sub:(b.platform||'')+(b.score?' \u00b7 '+b.score:''), sched:(b.result==='Scheduled'||b.date>now), id:b.id}); });
+  (DB.battles||[]).forEach(b=>{ const f=DB.members.find(m=>m.id===b.fighterId); items.push({when:b.date, type:'battle', title:(f?f.username:'Ranger')+' vs '+(b.opponent||'?'), sub:[b.community,(b.score||b.platform)].filter(Boolean).join(' \u00b7 '), sched:(b.result==='Scheduled'||b.date>now), id:b.id}); });
   (DB.events||[]).forEach(e=>{ items.push({when:e.starts_at, type:'mission', title:e.title, sub:(e.platform||'')+' \u00b7 '+(e.category||''), sched:true, id:e.id}); });
   return items; }
 function upNextItems(limit){ const now=Date.now()-3600000; return calEvents().filter(x=>x.when>=now && (x.type==='mission'||x.sched)).sort((a,b)=>a.when-b.when).slice(0,limit||4); }

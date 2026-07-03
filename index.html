@@ -1321,6 +1321,21 @@ async function addScheduled(){ const g=id=>{const e=document.getElementById(id);
   await loadContent(); toast('Added to the schedule \u26A1','gold'); scheduleOpen=true; render();
   setTimeout(()=>{ const o=document.getElementById('sch_opp'); if(o) o.focus(); },0);
 }
+async function importSchedule(){ const ta=document.getElementById('sch_bulk'); const raw=(ta&&ta.value||'').trim(); if(!raw){ toast('Paste your schedule first','bad'); return; }
+  const now=new Date(); const rows=[];
+  raw.split(/\n+/).forEach(line=>{ line=line.trim(); if(!line || !/\d{1,2}\/\d{1,2}/.test(line)) return;
+    const p=line.split('|').map(x=>x.trim()); if(p.length<3) return;
+    const dm=p[0].match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/); if(!dm) return; const mo=+dm[1], da=+dm[2]; let yr=dm[3]?(+dm[3]<100?2000+ +dm[3]:+dm[3]):now.getFullYear();
+    const tm=p[1].match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i); if(!tm) return; let hh=+tm[1]; const mm=+tm[2]; const ap=(tm[3]||'').toUpperCase(); if(ap==='PM'&&hh<12)hh+=12; if(ap==='AM'&&hh===12)hh=0;
+    const when=new Date(yr,mo-1,da,hh,mm); if(isNaN(when.getTime())) return;
+    rows.push({ fighter_id:me().id, opponent:p[2]||'Unknown', community:'', result:'Scheduled', score:'', platform:'TikTok', battle_date:when.toISOString(), link:'', note:p[3]||'', opp_img:null });
+  });
+  if(!rows.length){ toast('Couldn\u2019t read any battles \u2014 check the format','bad'); return; }
+  const btn=document.getElementById('sch_import'); if(btn){ btn.disabled=true; btn.textContent='Importing\u2026'; }
+  const { error } = await sb.from('battles').insert(rows);
+  if(error){ toast('Import failed: '+error.message,'bad'); if(btn){ btn.disabled=false; btn.textContent='Import all'; } return; }
+  if(ta) ta.value=''; await loadContent(); scheduleOpen=true; render(); toast('Imported '+rows.length+' battles \u26A1','gold');
+}
 function scheduleOverlay(){ if(!scheduleOpen) return '';
   const u=me(); const now=Date.now();
   const opts=DB.members.map(m=>`<option value="${m.id}" ${m.id===u.id?'selected':''}>${esc(m.username)}</option>`).join('');
@@ -1341,6 +1356,12 @@ function scheduleOverlay(){ if(!scheduleOpen) return '';
         <div class="col-span-2"><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Platform</label><input id="sch_plat" value="TikTok" class="${IN2}"></div>
       </div>
       <button id="sch_add" onclick="addScheduled()" class="w-full py-3 rounded-xl font-bold text-ink bg-gradient-to-b from-[#ff5a4d] to-orchid hover:brightness-110 mb-4">Add to schedule</button>
+      <div class="border-t border-line pt-4 mb-4">
+        <div class="text-[11px] uppercase tracking-wide text-steel mb-1">Or paste a whole week</div>
+        <p class="text-[11px] text-steel mb-2">One battle per line: <span class="text-silver">MM/DD | 8:30 PM | opponent | note</span></p>
+        <textarea id="sch_bulk" rows="6" placeholder="07/01 | 8:30 PM | swolemigoking | 20-30K diamonds" class="${IN2} resize-none font-mono text-[12px]"></textarea>
+        <button id="sch_import" onclick="importSchedule()" class="w-full mt-2 py-2.5 rounded-xl font-semibold text-chalk bg-raised border border-line hover:border-orchid">Import all</button>
+      </div>
       <div class="text-[11px] uppercase tracking-wide text-steel mb-2">Scheduled battles</div>
       <div class="space-y-1.5">${list}</div>
     </div>

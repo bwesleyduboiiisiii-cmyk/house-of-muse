@@ -1306,7 +1306,20 @@ function saveChallengeForm(){
   editing=null; save(); render(); toast('Drill saved','gold');
 }
 function deleteChallenge(id){ if(!confirm('Delete this drill? It is removed from everyone\u2019s progress.')) return; DB.challenges=DB.challenges.filter(c=>c.id!==id); DB.members.forEach(m=>{ m.done=(m.done||[]).filter(x=>x!==id); m.pending=(m.pending||[]).filter(p=>p.ref!==id); }); editing=null; save(); render(); toast('Drill deleted'); }
-var battleFilter='all'; var calMonth=0, calSel=0; var scheduleOpen=false;
+var battleFilter='all'; var calMonth=0, calSel=0; var scheduleOpen=false; var attnBattle=null; var RSVP_ENERGY=15, ATTEND_POWER=50, ATTEND_ENERGY=25;
+function battleRsvpData(id){ DB.reactions=DB.reactions||{}; const k='br:'+id; const d=DB.reactions[k]=DB.reactions[k]||{}; d.rsvp=d.rsvp||{}; d.attended=d.attended||{}; d.paidR=d.paidR||{}; d.paidA=d.paidA||{}; return d; }
+async function saveBattleRsvp(id){ try{ const k='br:'+id; const { error } = await sb.from('reactions').upsert({key:k, data:DB.reactions[k]}); if(error) console.warn('rsvp save', error.message); }catch(e){} }
+async function rsvpBattle(id){ const u=me(); const d=battleRsvpData(id); if(d.rsvp[u.id]){ toast('You already RSVP’d','bad'); return; } d.rsvp[u.id]=Date.now(); let gained=0; if(!d.paidR[u.id]){ d.paidR[u.id]=true; awardCoins(u,RSVP_ENERGY,'RSVP: battle'); gained=RSVP_ENERGY; } render(); await saveBattleRsvp(id); upsertProfile(u); toast(gained?('You’re in — +'+gained+' Energy ⚡'):'You’re in','gold'); }
+async function cancelRsvp(id){ const u=me(); const d=battleRsvpData(id); delete d.rsvp[u.id]; render(); await saveBattleRsvp(id); toast('RSVP cancelled'); }
+function openAttendance(id){ attnBattle=id; render(); }
+function closeAttendance(){ attnBattle=null; render(); }
+async function markAttended(id,uid){ const u=me(); if(u.role!=='Owner'&&u.role!=='Manager'){ toast('Only the owner or a manager can confirm attendance','bad'); return; } const d=battleRsvpData(id); if(d.attended[uid]){ toast('Already confirmed','bad'); return; } d.attended[uid]=Date.now(); const m=DB.members.find(x=>x.id===uid); if(m && !d.paidA[uid]){ d.paidA[uid]=true; awardXP(m,ATTEND_POWER,'Showed up: battle'); awardCoins(m,ATTEND_ENERGY,'Showed up: battle'); pushInbox(uid,'message','✅ You showed up — +'+ATTEND_POWER+' Power, +'+ATTEND_ENERGY+' Energy!'); upsertOther(m); } render(); await saveBattleRsvp(id); toast('Confirmed — bonus granted','gold'); }
+async function unmarkAttended(id,uid){ const u=me(); if(u.role!=='Owner'&&u.role!=='Manager') return; const d=battleRsvpData(id); delete d.attended[uid]; render(); await saveBattleRsvp(id); toast('Attendance removed'); }
+function attendanceOverlay(){ if(!attnBattle) return ''; const b=(DB.battles||[]).find(x=>x.id===attnBattle); if(!b) return ''; const d=battleRsvpData(attnBattle); const ids=Object.keys(d.rsvp); const f=DB.members.find(m=>m.id===b.fighterId);
+  const rows=ids.length?ids.map(uid=>{ const m=DB.members.find(x=>x.id===uid); if(!m) return ''; const att=!!d.attended[uid];
+    return `<div class="flex items-center gap-3 px-3 py-2 rounded-lg bg-raised/60 border border-line"><button onclick="openProfile('${m.id}')" class="shrink-0">${avatar(m.username,28,colorHex(m.color))}</button><div class="min-w-0 flex-1"><div class="text-[13px] text-chalk truncate">${esc(m.username)}</div><div class="text-[11px] ${att?'text-emerald-300':'text-steel'}">${att?'Showed up — rewarded':'RSVP’d'}</div></div>${att?`<button onclick="unmarkAttended('${attnBattle}','${uid}')" class="text-[11px] px-2 py-1 rounded bg-raised text-steel hover:text-rose shrink-0">Undo</button>`:`<button onclick="markAttended('${attnBattle}','${uid}')" class="text-[11px] px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 shrink-0">Confirm</button>`}</div>`; }).join(''):`<div class="text-[12px] text-steel px-1 py-3">No RSVPs yet for this battle.</div>`;
+  return `<div class="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onclick="if(event.target===this)closeAttendance()"><div class="bg-panel border border-line w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl p-5 max-h-[88vh] overflow-y-auto"><div class="flex items-center justify-between mb-1"><h3 class="font-display text-xl">Attendance</h3><button onclick="closeAttendance()" class="text-steel hover:text-chalk text-2xl leading-none">×</button></div><p class="text-[12px] text-steel mb-4">${f?esc(f.username):'Ranger'} vs ${esc(b.opponent)} — confirm who showed up to grant +${ATTEND_POWER} Power, +${ATTEND_ENERGY} Energy.</p><div class="space-y-1.5">${rows}</div></div></div>`;
+}
 function openSchedule(){ scheduleOpen=true; render(); setTimeout(()=>{ const d=document.getElementById('sch_date'); if(d&&!d.value){ d.value=new Date().toISOString().slice(0,10); } const o=document.getElementById('sch_opp'); if(o) o.focus(); },0); }
 function closeSchedule(){ scheduleOpen=false; render(); }
 async function addScheduled(){ const g=id=>{const e=document.getElementById(id);return e?e.value:'';};
@@ -2358,6 +2371,8 @@ function viewBattles(){
         <span class="text-[11px] px-2 py-0.5 rounded-full shrink-0" style="background:${c}22;color:${c}">${b.result}${b.score?' \u00b7 '+esc(b.score):''}</span>
       </div>
       ${b.note?`<p class="text-[12px] text-silver mt-2 leading-snug">${esc(b.note)}</p>`:''}
+      ${(()=>{ const rd=battleRsvpData(b.id); const rc=Object.keys(rd.rsvp).length; const at=Object.keys(rd.attended).length; const mineR=!!rd.rsvp[u.id]; const up=(b.result==='Scheduled'||b.date>Date.now());
+        return `<div class="flex items-center gap-2 mt-2 flex-wrap">${up?(mineR?`<button onclick="cancelRsvp('${b.id}')" class="text-[11px] px-2.5 py-1 rounded-md bg-emerald-500/20 text-emerald-300">You’re in ✓</button>`:`<button onclick="rsvpBattle('${b.id}')" class="text-[11px] px-2.5 py-1 rounded-md bg-orchid/20 text-orchid hover:bg-orchid/30">RSVP to attend</button>`):`<span class="text-[11px] text-steel">${at} showed up</span>`}${up?`<span class="text-[11px] text-steel">${rc} going</span>`:''}${isStaff?`<button onclick="openAttendance('${b.id}')" class="ml-auto text-[11px] px-2.5 py-1 rounded-md bg-raised border border-line text-steel hover:text-gold">Attendance (${rc})</button>`:''}</div>`; })()}
       ${true?`<div class="flex items-center gap-2 mt-2"><button onclick="shareCard('battle','${b.id}')" class="text-[11px] px-2.5 py-1 rounded-md bg-raised border border-line text-steel hover:text-gold">Share</button>
         ${b.link?`<a href="${esc(b.link)}" target="_blank" rel="noopener" class="text-[11px] text-orchid hover:underline">Watch \u2197</a>`:''}
         ${mine?`<button onclick="editBattle('${b.id}')" class="ml-auto text-[11px] px-2.5 py-1 rounded-md bg-raised border border-line text-steel hover:text-chalk">Edit</button><button onclick="deleteBattle('${b.id}')" class="text-[11px] px-2.5 py-1 rounded-md bg-raised border border-line text-steel hover:text-rose">Delete</button>`:''}
@@ -2378,6 +2393,7 @@ function viewBattles(){
     <div class="grid sm:grid-cols-2 gap-3">${cards}</div>
     ${editorOverlay()}
     ${scheduleOverlay()}
+    ${attendanceOverlay()}
   `);
 }
 function ensureLore(u){ if(u._lore) return; u._lore=true; u.inbox=u.inbox||[];

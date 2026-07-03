@@ -258,7 +258,7 @@ function rowToMember(r){ const p=r.prefs||{};
     prefs:{ animations:p.animations!==false, nudges:p.nudges!==false, publicProfile:p.publicProfile!==false, sounds:!!p.sounds },
     rsvps:r.rsvps||[], done:r.done||[], inbox:r.inbox||[],
     joined_at: r.joined_at?new Date(r.joined_at).getTime():Date.now(),
-    feed:p._feed||[], xpLog:[], purchases:p._purchases||[], tag:p._tag||'', questDone:p._questDone||{}, roomLog:[], freezes:1, pending:p._pending||[], onboarded:true,
+    feed:p._feed||[], xpLog:[], purchases:p._purchases||[], tag:p._tag||'', perks:p._perks||{}, boostNext:!!p._boostNext, questDone:p._questDone||{}, roomLog:[], freezes:1, pending:p._pending||[], onboarded:true,
     _lore:!!p._lore, _hideChecklist:!!p._hideChecklist };
 }
 function memberToRow(u){ const pr=u.prefs||{};
@@ -268,7 +268,7 @@ function memberToRow(u){ const pr=u.prefs||{};
     avatar_url:u.avatarImg||null, banner_url:u.bannerImg||null,
     badges:u.badges||[], socials:u.socials||{},
     prefs:{ animations:pr.animations!==false, nudges:pr.nudges!==false, publicProfile:pr.publicProfile!==false, sounds:!!pr.sounds,
-            _last_checkin:u.last_checkin||null, _purchases:u.purchases||[], _tag:u.tag||'', _feed:(u.feed||[]).slice(0,40), _questDone:u.questDone||{}, _pending:u.pending||[], _lore:!!u._lore, _hideChecklist:!!u._hideChecklist },
+            _last_checkin:u.last_checkin||null, _purchases:u.purchases||[], _tag:u.tag||'', _perks:u.perks||{}, _boostNext:!!u.boostNext, _feed:(u.feed||[]).slice(0,40), _questDone:u.questDone||{}, _pending:u.pending||[], _lore:!!u._lore, _hideChecklist:!!u._hideChecklist },
     rsvps:u.rsvps||[], done:u.done||[], inbox:u.inbox||[] };
 }
 function upsertProfile(u){ if(!u||!sb) return; sb.from('profiles').update(memberToRow(u)).eq('id',u.id).then(r=>{ if(r.error) console.warn('save', r.error.message); }); }
@@ -484,26 +484,26 @@ function seed(){
     { slot:'Longest Streak', user:'RED_LEADER' },
   ];
   const store = [
-    { id:'s4', name:'Free Design Review', cost:250, glyph:'📣', desc:'A real 1:1 review of your branding or content with @monsieuraiii.' },
-    { id:'s7', name:'Buzz Shoutout', cost:250, glyph:'📢', desc:'The owner hypes your latest drop to the whole squad in The Buzz.' },
-    { id:'s1', name:'Pick Your Color', cost:300, glyph:'🎨', desc:'Claim your ranger hue — your name color across the House.' },
-    { id:'s8', name:'Custom Callsign Tag', cost:350, glyph:'🏷️', desc:'A custom title under your name — “The Closer”, “Combo King”, you pick.' },
-    { id:'s6', name:'Early Mission Access', cost:400, glyph:'⏰', desc:'RSVP to missions and battles 24h before everyone else.' },
-    { id:'s9', name:'Profile Banner', cost:450, glyph:'🖼️', desc:'Unlock a custom banner across the top of your profile.' },
-    { id:'s10', name:'VIP Comms Room', cost:500, glyph:'🔐', desc:'Access to the private strategy room with the owner and managers.' },
-    { id:'s2', name:'Pinned Mission', cost:550, glyph:'📌', desc:'Your latest work pinned to the top of the feed for a week.' },
-    { id:'s5', name:'TikTok Feature', cost:600, glyph:'✨', desc:'Get shouted out / featured on @monsieuraiii’s TikTok.' },
-    { id:'s11', name:'Priority Battle Slot', cost:650, glyph:'⚔️', desc:'First pick of the next battle you want — and featured as attending.' },
-    { id:'s12', name:'Ranger of the Week', cost:750, glyph:'🌟', desc:'Top spotlight on HQ for a full week, plus pinned in The Buzz.' },
-    { id:'s3', name:'Quartermaster Medal', cost:800, glyph:'🎖️', desc:'Wear the Quartermaster medal on your profile.' },
-    { id:'s13', name:'1:1 Strategy Call', cost:900, glyph:'📞', desc:'A 30-minute growth + content strategy call with @monsieuraiii.' },
-    { id:'s14', name:'Custom Graphic or Overlay', cost:1000, glyph:'🖌️', desc:'A real branded graphic or live-stream overlay, designed for you.' },
-    { id:'s15', name:'Link-in-Bio Audit', cost:1100, glyph:'🔍', desc:'A pro teardown of your site or link-in-bio with fixes you can use.' },
-    { id:'s16', name:'Collab Video', cost:1200, glyph:'🎬', desc:'A real duet / collab video with @monsieuraiii.' },
-    { id:'s17', name:'Guest on a House LIVE', cost:1400, glyph:'🎙️', desc:'Co-host a segment on a House of MUSE live stream.' },
-    { id:'s18', name:'Custom Suit Skin', cost:1600, glyph:'🦸', desc:'A one-of-one profile look designed just for you.' },
-    { id:'s19', name:'House Legend Status', cost:1800, glyph:'🏆', desc:'A permanent Hall of Legends entry and a unique legend badge.' },
-    { id:'s20', name:'Founding Ranger Crest', cost:2000, glyph:'👑', desc:'A permanent founding-member crest — top of the roster, forever.' },
+    { id:'r1',  name:'HQ Spotlight', cost:250, glyph:'🔦', desc:'Your latest post or stream is featured in The Buzz for 24 hours.' },
+    { id:'r2',  name:'Creator Feedback', cost:300, glyph:'📝', desc:'Personalized feedback on one piece of your content from HQ.' },
+    { id:'r3',  name:'Ranger Recognition', cost:350, glyph:'📣', desc:'A public shoutout celebrating your consistency, growth, or support of others.' },
+    { id:'r4',  name:'Mission Boost', cost:400, glyph:'⚡', desc:'Double the Power earned from your next completed mission.' },
+    { id:'r5',  name:'Custom Callsign', cost:450, glyph:'🏷️', desc:'Unlock a personalized callsign under your profile — Builder, Pathfinder, Visionary…' },
+    { id:'r6',  name:'Growth Blueprint', cost:500, glyph:'🗺️', desc:'A personalized creator roadmap with actionable next steps.' },
+    { id:'r7',  name:'Creator Spotlight', cost:550, glyph:'🌟', desc:'Featured creator across HQ for 7 days — homepage, The Buzz + a community announcement.' },
+    { id:'r8',  name:'Mission Architect', cost:600, glyph:'🛠️', desc:'Create an official House of MUSE mission for the whole community.' },
+    { id:'r9',  name:'Featured Creator Review', cost:700, glyph:'🔍', desc:'Your content, branding, and profile reviewed live by HQ.' },
+    { id:'r10', name:'Strategy Session', cost:800, glyph:'📞', desc:'A private 20-minute coaching session focused on your next level.' },
+    { id:'r11', name:'VIP Creator Pass', cost:900, glyph:'🎟️', desc:'30 days of VIP: badge, name color, chat role, early mission access + priority event registration.' },
+    { id:'r12', name:'Community Champion', cost:950, glyph:'🏅', desc:'30 days: Champion badge, banner, name tag + color, and homepage recognition.' },
+    { id:'r13', name:'Battle Captain', cost:1000, glyph:'⚔️', desc:'Lead an official House battle, challenge, or community event.' },
+    { id:'r14', name:'2v2 House LIVE Feature', cost:1100, glyph:'🎬', desc:'Co-host a featured 2v2 House Battle LIVE with @chanel.b.dancing and HQ — promo + spotlight.' },
+    { id:'r15', name:'Ranger Identity Pack', cost:1200, glyph:'🎨', desc:'30 days: animated banner + name tag, exclusive profile frame, name color & Ranger aura.' },
+    { id:'r16', name:'HQ Takeover', cost:1300, glyph:'🎙️', desc:'Be the face of HQ for a day — pick the mission + topic, pinned announcement, featured all day.' },
+    { id:'r17', name:'Loyalty Multiplier', cost:1400, glyph:'🔁', desc:'Earn 2× Energy from completed missions for 7 days.' },
+    { id:'r18', name:"Founder's Roundtable", cost:1600, glyph:'🤝', desc:'An exclusive strategy session with HQ leadership — updates, growth, ideas + open Q&A.' },
+    { id:'r19', name:'Guardian of the House', cost:1800, glyph:'🛡️', desc:'30 days: the top service role — badge, animated banner/name, lounge access + welcome new Rangers.' },
+    { id:'r20', name:'House Legend', cost:2000, glyph:'👑', desc:'30 days, the highest honor — animated legend badge, banner + frame, top of HQ, a mission named after you + Legend Lounge.' },
   ];
   const announcements = [
     { id:'a1', title:'Season II: Suit Up', body:'New ranks, new medals, fresh leaderboard. Power carries over \u2014 your streak does not. Morph in today.', t:now-1*day },
@@ -593,10 +593,23 @@ function avatar(name, px, ring){
   const h=hash(name); const a=h%360, b=(h*7)%360;
   return `<div class="shrink-0 grid place-items-center rounded-full font-display font-bold text-ink" style="width:${px}px;height:${px}px;font-size:${px*0.4}px;background:linear-gradient(135deg,hsl(${a} 55% 62%),hsl(${b} 60% 48%))">${init}</div>`;
 }
-function avatarOf(m,px,ring){ ring=ring||colorHex(m&&m.color);
+function avatarOf(m,px,ring){ ring=ring||colorHex(m&&m.color); let base;
   if(m&&m.avatarImg){ const rw=Math.max(1,Math.round(px*0.05));
-    return `<div class="shrink-0 rounded-full bg-center bg-cover" style="width:${px}px;height:${px}px;background-image:url(${m.avatarImg});box-shadow:0 0 0 ${rw}px ${ring}, 0 0 ${Math.round(px*0.5)}px -3px ${ring}"></div>`; }
-  return avatar(m?m.username:'?',px,ring);
+    base=`<div class="shrink-0 rounded-full bg-center bg-cover" style="width:${px}px;height:${px}px;background-image:url(${m.avatarImg});box-shadow:0 0 0 ${rw}px ${ring}, 0 0 ${Math.round(px*0.5)}px -3px ${ring}"></div>`; }
+  else base=avatar(m?m.username:'?',px,ring);
+  const p=(typeof topPerk==='function')?topPerk(m):null;
+  if(p) return `<span class="shrink-0 inline-grid place-items-center rounded-full" style="border-radius:9999px;box-shadow:0 0 0 2px ${p.color}, 0 0 16px 2px ${p.color}99">${base}</span>`;
+  return base;
+}
+const PERK_DUR={ r7:7, r11:30, r12:30, r15:30, r16:1, r17:7, r19:30, r20:30 };
+function activePerk(m,id){ if(!m||!(m.purchases||[]).includes(id)) return false; if(!PERK_DUR[id]) return true; const e=m.perks&&m.perks[id]; return !!(e&&e>Date.now()); }
+const PERK_STYLE=[['r20','LEGEND','#FFC83D'],['r19','GUARDIAN','#38BDF8'],['r12','CHAMPION','#FF3D9A'],['r11','VIP','#A78BFA'],['r15','RANGER','#22D3EE']];
+function topPerk(m){ if(!m) return null; for(const t of PERK_STYLE){ if(activePerk(m,t[0])) return {id:t[0],label:t[1],color:(t[0]==='r15'?colorHex(m.color):t[2])}; } return null; }
+function perkBadge(m){ const p=topPerk(m); return p?`<span class="text-[10px] font-bold px-2 py-0.5 rounded-full align-middle" style="background:${p.color}22;color:${p.color};box-shadow:inset 0 0 0 1px ${p.color}66">${p.label}</span>`:''; }
+function hqSpotlight(){ const F=(arr,label,color,glyph)=>arr.length?arr.map(m=>`<button onclick="openProfile('${m.id}')" class="flex items-center gap-2 px-3 py-2 rounded-xl bg-raised/60 border border-line hover:border-orchid">${avatarOf(m,32,colorHex(m.color))}<div class="text-left min-w-0"><div class="text-[13px] text-chalk truncate">${esc(m.username)}</div><div class="text-[10px] font-bold" style="color:${color}">${glyph} ${label}</div></div></button>`).join(''):'';
+  const inner=[ F(DB.members.filter(m=>activePerk(m,'r20')),'HOUSE LEGEND','#FFC83D','👑'), F(DB.members.filter(m=>activePerk(m,'r16')),'HQ TAKEOVER','#38BDF8','🎙️'), F(DB.members.filter(m=>activePerk(m,'r7')),'CREATOR SPOTLIGHT','#FF3D9A','🌟') ].filter(Boolean).join('');
+  if(!inner) return '';
+  return `<div class="rounded-2xl border border-gold/30 bg-gradient-to-b from-gold/10 to-transparent p-4 mb-5"><div class="text-[11px] uppercase tracking-[.2em] text-gold/80 mb-2">✨ Spotlight</div><div class="flex flex-wrap gap-2">${inner}</div></div>`;
 }
 const ICON = {
   spark:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-full h-full"><path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l3.5 3.5M15.5 15.5L19 19M19 5l-3.5 3.5M8.5 15.5L5 19"/></svg>',
@@ -1055,6 +1068,7 @@ function viewDashboard(){
 
   app.innerHTML = shell(`
     ${ownerClaimCard(u)}
+    ${hqSpotlight()}
     ${onboardingOverlay(u)}
 
     <div class="relative overflow-hidden rounded-2xl border border-line ring-soft mb-5">
@@ -1344,13 +1358,14 @@ async function addScheduled(){ const g=id=>{const e=document.getElementById(id);
   const dateStr=g('sch_date'), timeStr=g('sch_time')||'20:00';
   if(!dateStr){ toast('Pick a date','bad'); return; }
   const when=new Date(dateStr+'T'+timeStr); if(isNaN(when)){ toast('Check the date and time','bad'); return; }
-  const pow=g('sch_pow').trim();
-  const row={ fighter_id:g('sch_fighter')||me().id, opponent:opp, community:g('sch_agency').trim(), result:'Scheduled', score:'', platform:'TikTok', battle_date:when.toISOString(), link:'', note:pow?('Power-Ups: '+pow):'', opp_img:null };
+  const dia=g('sch_diamonds').trim(); const pow=g('sch_pow')||'No'; const adult=g('sch_adult')||'No';
+  const note=[dia?('Diamonds: '+dia):'', 'Power-Ups: '+pow, '18+: '+adult].filter(Boolean).join(' \u00b7 ');
+  const row={ fighter_id:g('sch_fighter')||me().id, opponent:opp, community:g('sch_agency').trim(), result:'Scheduled', score:'', platform:'TikTok', battle_date:when.toISOString(), link:'', note:note, opp_img:null };
   const btn=document.getElementById('sch_add'); if(btn){ btn.disabled=true; btn.textContent='Adding\u2026'; }
   const { error } = await sb.from('battles').insert(row);
   if(error){ toast('Could not add: '+error.message,'bad'); if(btn){ btn.disabled=false; btn.textContent='Add to schedule'; } return; }
   await loadContent(); toast('Added to the schedule \u26A1','gold'); scheduleOpen=true; render();
-  setTimeout(()=>{ const a=document.getElementById('sch_agency'); if(a) a.focus(); },0);
+  setTimeout(()=>{ const of=document.getElementById('sch_opp'); if(of) of.focus(); },0);
 }
 async function importSchedule(){ const ta=document.getElementById('sch_bulk'); const raw=(ta&&ta.value||'').trim(); if(!raw){ toast('Paste your schedule first','bad'); return; }
   const fsel=document.getElementById('sch_fighter'); const fid=(fsel&&fsel.value)||me().id;
@@ -1360,7 +1375,7 @@ async function importSchedule(){ const ta=document.getElementById('sch_bulk'); c
     const dm=p[0].match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/); if(!dm) return; const mo=+dm[1], da=+dm[2]; let yr=dm[3]?(+dm[3]<100?2000+ +dm[3]:+dm[3]):now.getFullYear();
     const tm=p[1].match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i); if(!tm) return; let hh=+tm[1]; const mm=+tm[2]; const ap=(tm[3]||'').toUpperCase(); if(ap==='PM'&&hh<12)hh+=12; if(ap==='AM'&&hh===12)hh=0;
     const when=new Date(yr,mo-1,da,hh,mm); if(isNaN(when.getTime())) return;
-    rows.push({ fighter_id:fid, opponent:p[2]||'Unknown', community:p[3]||'', result:'Scheduled', score:'', platform:'TikTok', battle_date:when.toISOString(), link:'', note:p[4]?('Power-Ups: '+p[4]):'', opp_img:null });
+    const nt=[p[4]?('Diamonds: '+p[4]):'', p[5]?('Power-Ups: '+p[5]):'', p[6]?('18+: '+p[6]):''].filter(Boolean).join(' \u00b7 '); rows.push({ fighter_id:fid, opponent:p[2]||'Unknown', community:p[3]||'', result:'Scheduled', score:'', platform:'TikTok', battle_date:when.toISOString(), link:'', note:nt, opp_img:null });
   });
   if(!rows.length){ toast('Couldn\u2019t read any battles \u2014 check the format','bad'); return; }
   const btn=document.getElementById('sch_import'); if(btn){ btn.disabled=true; btn.textContent='Importing\u2026'; }
@@ -1382,17 +1397,19 @@ function scheduleOverlay(){ if(!scheduleOpen) return '';
       <p class="text-[12px] text-steel mb-4">Punch in your week \u2014 each one drops onto the battle calendar. Add them one after another.</p>
       <div class="grid grid-cols-2 gap-3 mb-3">
         <div class="col-span-2"><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Fighter</label><select id="sch_fighter" class="${IN2}">${opts}</select></div>
-        <div class="col-span-2"><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Opponent agency</label><input id="sch_agency" placeholder="e.g. rare, pwr" class="${IN2}"></div>
         <div class="col-span-2"><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Opponent username</label><input id="sch_opp" placeholder="@rival" class="${IN2}"></div>
+        <div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Opponent agency</label><input id="sch_agency" placeholder="e.g. rare, pwr" class="${IN2}"></div>
+        <div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Diamonds / tier</label><input id="sch_diamonds" placeholder="e.g. 20-30K" class="${IN2}"></div>
         <div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Date</label><input id="sch_date" type="date" class="${IN2}"></div>
         <div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Time</label><input id="sch_time" type="time" value="20:00" class="${IN2}"></div>
-        <div class="col-span-2"><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Power-Ups</label><input id="sch_pow" placeholder="e.g. Yes, No, or which ones" class="${IN2}"></div>
+        <div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Power-Ups</label><select id="sch_pow" class="${IN2}"><option>No</option><option>Yes</option></select></div>
+        <div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">18+</label><select id="sch_adult" class="${IN2}"><option>No</option><option>Yes</option></select></div>
       </div>
       <button id="sch_add" onclick="addScheduled()" class="w-full py-3 rounded-xl font-bold text-ink bg-gradient-to-b from-[#ff5a4d] to-orchid hover:brightness-110 mb-4">Add to schedule</button>
       <div class="border-t border-line pt-4 mb-4">
         <div class="text-[11px] uppercase tracking-wide text-steel mb-1">Or paste a whole week</div>
-        <p class="text-[11px] text-steel mb-2">One battle per line: <span class="text-silver">MM/DD | 8:30 PM | opponent | agency | power-ups</span></p>
-        <textarea id="sch_bulk" rows="6" placeholder="07/01 | 8:30 PM | swolemigoking | rare | Yes" class="${IN2} resize-none font-mono text-[12px]"></textarea>
+        <p class="text-[11px] text-steel mb-2">One battle per line: <span class="text-silver">MM/DD | 8:30 PM | opponent | agency | diamonds | power-ups | 18+</span></p>
+        <textarea id="sch_bulk" rows="6" placeholder="07/01 | 8:30 PM | swolemigoking | rare | 20-30K | Yes | No" class="${IN2} resize-none font-mono text-[12px]"></textarea>
         <button id="sch_import" onclick="importSchedule()" class="w-full mt-2 py-2.5 rounded-xl font-semibold text-chalk bg-raised border border-line hover:border-orchid">Import all</button>
       </div>
       <div class="text-[11px] uppercase tracking-wide text-steel mb-2">Scheduled battles</div>
@@ -1616,7 +1633,7 @@ function viewHall(){
 /* ---------- STORE ---------- */
 function viewStore(){
   const u=me(); const owned=(u.purchases||[]);
-  const rarOf=c=>c>=1600?{n:'Mythic',c:'#A78BFA'}:c>=900?{n:'Legendary',c:'#FFC83D'}:c>=550?{n:'Epic',c:'#FF3D9A'}:c>=350?{n:'Rare',c:'#E12B38'}:{n:'Common',c:'#9B93AE'};
+  const rarOf=c=>c>=2000?{n:'Mythic',c:'#FFC83D'}:c>=1300?{n:'Legendary',c:'#E12B38'}:c>=900?{n:'Epic',c:'#A78BFA'}:c>=500?{n:'Rare',c:'#2563EB'}:{n:'Common',c:'#16A34A'};
   const card=s=>{ const own=owned.includes(s.id), aff=u.coins>=s.cost, r=rarOf(s.cost), rc=r.c, pct=Math.min(100,Math.round(u.coins/s.cost*100));
     return `<div class="relative overflow-hidden rounded-2xl p-4 flex flex-col hover-lift" style="background:linear-gradient(165deg, ${rc}14, #14121C 62%);border:1px solid ${own?'rgba(255,200,61,.5)':aff?rc+'66':'#2A2636'};${aff&&!own?'box-shadow:0 0 26px -12px '+rc:''}">
       <div class="absolute -top-10 -right-8 w-32 h-32 rounded-full blur-2xl pointer-events-none" style="background:${rc};opacity:.16"></div>
@@ -1886,7 +1903,8 @@ function approveSubmission(mid,pid){
   m.pending=(m.pending||[]).filter(x=>x.pid!==pid);
   if(p.kind==='quest'){ m.questDone=m.questDone||{}; m.questDone[p.qscope]=m.questDone[p.qscope]||{}; const key=p.qscope==='daily'?_dayKey():_weekKey(); m.questDone[p.qscope][key]=m.questDone[p.qscope][key]||[]; if(!m.questDone[p.qscope][key].includes(p.ref)) m.questDone[p.qscope][key].push(p.ref); }
   else { if(!m.done.includes(p.ref)) m.done.push(p.ref); }
-  awardXP(m,p.xp||0,'Approved: '+p.title); awardCoins(m,p.coins||0,'Approved: '+p.title); if(p.badge) earnBadge(m,p.badge);
+  let _xp=p.xp||0, _co=p.coins||0; if(m.boostNext){ _xp*=2; m.boostNext=false; } if(activePerk(m,'r17')) _co*=2;
+  awardXP(m,_xp,'Approved: '+p.title); awardCoins(m,_co,'Approved: '+p.title); if(p.badge) earnBadge(m,p.badge);
   pushInbox(mid,'message',`\u2705 \u201C${p.title}\u201D approved \u2014 +${p.xp||0} Power, +${p.coins||0} Energy!`);
   upsertOther(m); render(); toast(`Approved ${m.username}\u2019s submission`,'gold');
 }
@@ -1903,7 +1921,9 @@ function buy(id){
   if(u.purchases.includes(id)){ toast('You already own that','bad'); return; }
   if(u.coins<s.cost){ toast('Not enough Energy yet','bad'); return; }
   u.coins-=s.cost; u.purchases.push(id);
-  if(id==='s8'){ const t=(prompt('Your custom tag (shows under your name) \u2014 e.g. The Closer, Combo King:')||'').trim(); if(t) u.tag=t.slice(0,24); }
+  if(PERK_DUR[id]){ u.perks=u.perks||{}; u.perks[id]=Date.now()+PERK_DUR[id]*86400000; }
+  if(id==='r4'){ u.boostNext=true; }
+  if(id==='r5'){ const t=(prompt('Your custom tag (shows under your name) \u2014 e.g. The Closer, Combo King:')||'').trim(); if(t) u.tag=t.slice(0,24); }
   if(!u.badges.includes('quartermaster') && (DB.members.find(m=>m.id===u.id))){
     const spent=DB.store.filter(x=>u.purchases.includes(x.id)).reduce((a,b)=>a+b.cost,0);
     if(spent>=1000) earnBadge(u,'quartermaster');
@@ -2200,8 +2220,8 @@ function growthFeed(m){
 }
 function openProfile(id){ if(activeRoom) disposeCall(); profileId=id; ROUTE='profile'; render(); window.scrollTo({top:0,behavior:'smooth'}); }
 function storeFlair(m){ const p=m.purchases||[]; const map={ s20:'👑', s19:'🏆', s3:'🎖️', s18:'🦸' }; const out=p.filter(id=>map[id]).map(id=>`<span class="text-lg leading-none" title="Unlocked reward">${map[id]}</span>`).join(''); return out; }
-function callsignTag(m){ return (m.purchases||[]).includes('s8') && m.tag ? `<span class="text-[11px] px-2 py-0.5 rounded-full bg-orchid/15 text-orchid">${esc(m.tag)}</span>` : ''; }
-function rewardChips(m){ const p=m.purchases||[]; if(!p.length) return '<span class="text-[12px] text-steel">No rewards unlocked yet \u2014 head to the Store.</span>'; return p.map(id=>{ const x=(DB.store||[]).find(y=>y.id===id); if(!x) return ''; return `<span class="inline-flex items-center gap-1.5 text-[12px] bg-raised border border-line rounded-lg px-2 py-1">${x.glyph} ${esc(x.name)}</span>`; }).join(''); }
+function callsignTag(m){ return (m.purchases||[]).includes('r5') && m.tag ? `<span class="text-[11px] px-2 py-0.5 rounded-full bg-orchid/15 text-orchid">${esc(m.tag)}</span>` : ''; }
+function rewardChips(m){ const p=m.purchases||[]; if(!p.length) return '<span class="text-[12px] text-steel">No rewards unlocked yet \u2014 head to the Store.</span>'; return p.map(id=>{ const x=(DB.store||[]).find(y=>y.id===id); if(!x) return ''; const timed=PERK_DUR[id]; const exp=timed&&!activePerk(m,id); return `<span class="inline-flex items-center gap-1.5 text-[12px] bg-raised border border-line rounded-lg px-2 py-1 ${exp?'opacity-40':''}">${x.glyph} ${esc(x.name)}${timed?(exp?' · expired':' · active'):''}</span>`; }).join(''); }
 function viewProfile(){
   const meU=me();
   const m=DB.members.find(x=>x.id===profileId) || meU;
@@ -2221,7 +2241,7 @@ function viewProfile(){
       <div class="relative p-5 sm:p-6 flex items-start gap-4 flex-wrap">
         ${avatarOf(m,84,hex)}
         <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-2 flex-wrap"><h1 class="font-display text-3xl">${esc(m.username)}</h1>${storeFlair(m)}${m.color?rangerChip(m):''}${callsignTag(m)}</div>
+          <div class="flex items-center gap-2 flex-wrap"><h1 class="font-display text-3xl" style="${(()=>{const p=topPerk(m);return p?('color:'+p.color):'';})()}">${esc(m.username)}</h1>${perkBadge(m)}${storeFlair(m)}${m.color?rangerChip(m):''}${callsignTag(m)}</div>
           <div class="text-[12px] text-steel mt-1">${m.role} · <span style="color:${tier.c}">${tier.name}</span> · Level ${lp.level} · Joined ${new Date(m.joined_at).toLocaleDateString('en-US',{month:'short',year:'numeric'})}</div>
           <p class="text-[13px] text-silver mt-2 max-w-xl">${esc(m.bio||'')}</p>
         </div>

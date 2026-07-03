@@ -258,7 +258,7 @@ function rowToMember(r){ const p=r.prefs||{};
     prefs:{ animations:p.animations!==false, nudges:p.nudges!==false, publicProfile:p.publicProfile!==false, sounds:!!p.sounds },
     rsvps:r.rsvps||[], done:r.done||[], inbox:r.inbox||[],
     joined_at: r.joined_at?new Date(r.joined_at).getTime():Date.now(),
-    feed:p._feed||[], xpLog:[], purchases:p._purchases||[], questDone:p._questDone||{}, roomLog:[], freezes:1, pending:p._pending||[], onboarded:true,
+    feed:p._feed||[], xpLog:[], purchases:p._purchases||[], tag:p._tag||'', questDone:p._questDone||{}, roomLog:[], freezes:1, pending:p._pending||[], onboarded:true,
     _lore:!!p._lore, _hideChecklist:!!p._hideChecklist };
 }
 function memberToRow(u){ const pr=u.prefs||{};
@@ -268,7 +268,7 @@ function memberToRow(u){ const pr=u.prefs||{};
     avatar_url:u.avatarImg||null, banner_url:u.bannerImg||null,
     badges:u.badges||[], socials:u.socials||{},
     prefs:{ animations:pr.animations!==false, nudges:pr.nudges!==false, publicProfile:pr.publicProfile!==false, sounds:!!pr.sounds,
-            _last_checkin:u.last_checkin||null, _purchases:u.purchases||[], _feed:(u.feed||[]).slice(0,40), _questDone:u.questDone||{}, _pending:u.pending||[], _lore:!!u._lore, _hideChecklist:!!u._hideChecklist },
+            _last_checkin:u.last_checkin||null, _purchases:u.purchases||[], _tag:u.tag||'', _feed:(u.feed||[]).slice(0,40), _questDone:u.questDone||{}, _pending:u.pending||[], _lore:!!u._lore, _hideChecklist:!!u._hideChecklist },
     rsvps:u.rsvps||[], done:u.done||[], inbox:u.inbox||[] };
 }
 function upsertProfile(u){ if(!u||!sb) return; sb.from('profiles').update(memberToRow(u)).eq('id',u.id).then(r=>{ if(r.error) console.warn('save', r.error.message); }); }
@@ -1898,6 +1898,7 @@ function buy(id){
   if(u.purchases.includes(id)){ toast('You already own that','bad'); return; }
   if(u.coins<s.cost){ toast('Not enough Energy yet','bad'); return; }
   u.coins-=s.cost; u.purchases.push(id);
+  if(id==='s8'){ const t=(prompt('Your custom tag (shows under your name) \u2014 e.g. The Closer, Combo King:')||'').trim(); if(t) u.tag=t.slice(0,24); }
   if(!u.badges.includes('quartermaster') && (DB.members.find(m=>m.id===u.id))){
     const spent=DB.store.filter(x=>u.purchases.includes(x.id)).reduce((a,b)=>a+b.cost,0);
     if(spent>=1000) earnBadge(u,'quartermaster');
@@ -2193,6 +2194,9 @@ function growthFeed(m){
     </div>`).join('');
 }
 function openProfile(id){ if(activeRoom) disposeCall(); profileId=id; ROUTE='profile'; render(); window.scrollTo({top:0,behavior:'smooth'}); }
+function storeFlair(m){ const p=m.purchases||[]; const map={ s20:'👑', s19:'🏆', s3:'🎖️', s18:'🦸' }; const out=p.filter(id=>map[id]).map(id=>`<span class="text-lg leading-none" title="Unlocked reward">${map[id]}</span>`).join(''); return out; }
+function callsignTag(m){ return (m.purchases||[]).includes('s8') && m.tag ? `<span class="text-[11px] px-2 py-0.5 rounded-full bg-orchid/15 text-orchid">${esc(m.tag)}</span>` : ''; }
+function rewardChips(m){ const p=m.purchases||[]; if(!p.length) return '<span class="text-[12px] text-steel">No rewards unlocked yet \u2014 head to the Store.</span>'; return p.map(id=>{ const x=(DB.store||[]).find(y=>y.id===id); if(!x) return ''; return `<span class="inline-flex items-center gap-1.5 text-[12px] bg-raised border border-line rounded-lg px-2 py-1">${x.glyph} ${esc(x.name)}</span>`; }).join(''); }
 function viewProfile(){
   const meU=me();
   const m=DB.members.find(x=>x.id===profileId) || meU;
@@ -2212,7 +2216,7 @@ function viewProfile(){
       <div class="relative p-5 sm:p-6 flex items-start gap-4 flex-wrap">
         ${avatarOf(m,84,hex)}
         <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-2 flex-wrap"><h1 class="font-display text-3xl">${esc(m.username)}</h1>${m.color?rangerChip(m):''}</div>
+          <div class="flex items-center gap-2 flex-wrap"><h1 class="font-display text-3xl">${esc(m.username)}</h1>${storeFlair(m)}${m.color?rangerChip(m):''}${callsignTag(m)}</div>
           <div class="text-[12px] text-steel mt-1">${m.role} · <span style="color:${tier.c}">${tier.name}</span> · Level ${lp.level} · Joined ${new Date(m.joined_at).toLocaleDateString('en-US',{month:'short',year:'numeric'})}</div>
           <p class="text-[13px] text-silver mt-2 max-w-xl">${esc(m.bio||'')}</p>
         </div>
@@ -2260,6 +2264,10 @@ function viewProfile(){
         <section class="bg-panel border border-line rounded-2xl p-5">
           <h3 class="font-display text-lg mb-3">Medals</h3>
           <div class="flex flex-wrap gap-2">${medals}</div>
+        </section>
+        <section class="bg-panel border border-line rounded-2xl p-5">
+          <h3 class="font-display text-lg mb-3">Unlocked rewards</h3>
+          <div class="flex flex-wrap gap-2">${rewardChips(m)}</div>
         </section>
       </div>
     </div>

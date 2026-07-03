@@ -1265,7 +1265,7 @@ function viewLeaderboard(){
     const tier=tierFor(levelFromXP(m.xp)); const h=idx===0?'h-24':idx===1?'h-16':'h-12';
     const me_=m.id===u.id;
     return `<div class="flex flex-col items-center justify-end">
-      <div class="mb-2">${avatar(m.username, idx===0?64:52, colorHex(m.color))}</div>
+      <div class="mb-2">${avatarOf(m, idx===0?64:52, colorHex(m.color))}</div>
       <div class="text-sm font-semibold ${me_?'text-orchid':''} truncate max-w-[110px] text-center">${esc(m.username)}</div>
       <div class="font-mono text-[11px] text-steel mb-2">${fmt(val(m))}</div>
       <div class="${h} w-20 rounded-t-xl ${idx===0?'bg-gradient-to-t from-royal to-gold/70':'bg-raised border border-line'} grid place-items-start justify-center pt-1.5">

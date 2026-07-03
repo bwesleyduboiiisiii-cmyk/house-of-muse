@@ -1306,7 +1306,46 @@ function saveChallengeForm(){
   editing=null; save(); render(); toast('Drill saved','gold');
 }
 function deleteChallenge(id){ if(!confirm('Delete this drill? It is removed from everyone\u2019s progress.')) return; DB.challenges=DB.challenges.filter(c=>c.id!==id); DB.members.forEach(m=>{ m.done=(m.done||[]).filter(x=>x!==id); m.pending=(m.pending||[]).filter(p=>p.ref!==id); }); editing=null; save(); render(); toast('Drill deleted'); }
-var battleFilter='all'; var calMonth=0, calSel=0;
+var battleFilter='all'; var calMonth=0, calSel=0; var scheduleOpen=false;
+function openSchedule(){ scheduleOpen=true; render(); setTimeout(()=>{ const d=document.getElementById('sch_date'); if(d&&!d.value){ d.value=new Date().toISOString().slice(0,10); } const o=document.getElementById('sch_opp'); if(o) o.focus(); },0); }
+function closeSchedule(){ scheduleOpen=false; render(); }
+async function addScheduled(){ const g=id=>{const e=document.getElementById(id);return e?e.value:'';};
+  const opp=g('sch_opp').trim(); if(!opp){ toast('Enter an opponent','bad'); return; }
+  const dateStr=g('sch_date'), timeStr=g('sch_time')||'20:00';
+  if(!dateStr){ toast('Pick a date','bad'); return; }
+  const when=new Date(dateStr+'T'+timeStr); if(isNaN(when)){ toast('Check the date and time','bad'); return; }
+  const row={ fighter_id:g('sch_fighter')||me().id, opponent:opp, community:'', result:'Scheduled', score:'', platform:g('sch_plat').trim()||'TikTok', battle_date:when.toISOString(), link:'', note:'', opp_img:null };
+  const btn=document.getElementById('sch_add'); if(btn){ btn.disabled=true; btn.textContent='Adding\u2026'; }
+  const { error } = await sb.from('battles').insert(row);
+  if(error){ toast('Could not add: '+error.message,'bad'); if(btn){ btn.disabled=false; btn.textContent='Add to schedule'; } return; }
+  await loadContent(); toast('Added to the schedule \u26A1','gold'); scheduleOpen=true; render();
+  setTimeout(()=>{ const o=document.getElementById('sch_opp'); if(o) o.focus(); },0);
+}
+function scheduleOverlay(){ if(!scheduleOpen) return '';
+  const u=me(); const now=Date.now();
+  const opts=DB.members.map(m=>`<option value="${m.id}" ${m.id===u.id?'selected':''}>${esc(m.username)}</option>`).join('');
+  const up=(DB.battles||[]).filter(b=>b.result==='Scheduled'||b.date>now).sort((a,b)=>a.date-b.date);
+  const list=up.length?up.map(b=>{ const fr=DB.members.find(m=>m.id===b.fighterId); const d=new Date(b.date);
+    return `<div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-raised/60 border border-line"><span class="w-2 h-2 rounded-full shrink-0" style="background:#E12B38"></span><div class="min-w-0 flex-1"><div class="text-[13px] text-chalk truncate">${fr?esc(fr.username):'Ranger'} vs ${esc(b.opponent)}</div><div class="text-[11px] text-steel truncate">${d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})} \u00b7 ${d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})} \u00b7 ${esc(b.platform||'')}</div></div><button onclick="deleteBattle('${b.id}')" class="text-[11px] px-2 py-1 rounded bg-raised text-steel hover:text-rose shrink-0">Remove</button></div>`; }).join('')
+    :`<div class="text-[12px] text-steel px-1 py-2">No battles scheduled yet.</div>`;
+  const IN2='w-full bg-raised border border-line rounded-xl px-3 py-2.5 text-sm text-chalk focus:border-orchid outline-none';
+  return `<div class="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onclick="if(event.target===this)closeSchedule()">
+    <div class="bg-panel border border-line w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl p-5 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-2"><h3 class="font-display text-xl">Schedule battles</h3><button onclick="closeSchedule()" class="text-steel hover:text-chalk text-2xl leading-none">\u00d7</button></div>
+      <p class="text-[12px] text-steel mb-4">Punch in your week \u2014 each one drops onto the battle calendar. Add them one after another.</p>
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div class="col-span-2"><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Fighter</label><select id="sch_fighter" class="${IN2}">${opts}</select></div>
+        <div class="col-span-2"><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Opponent</label><input id="sch_opp" placeholder="@rival or crew name" class="${IN2}"></div>
+        <div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Date</label><input id="sch_date" type="date" class="${IN2}"></div>
+        <div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Time</label><input id="sch_time" type="time" value="20:00" class="${IN2}"></div>
+        <div class="col-span-2"><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Platform</label><input id="sch_plat" value="TikTok" class="${IN2}"></div>
+      </div>
+      <button id="sch_add" onclick="addScheduled()" class="w-full py-3 rounded-xl font-bold text-ink bg-gradient-to-b from-[#ff5a4d] to-orchid hover:brightness-110 mb-4">Add to schedule</button>
+      <div class="text-[11px] uppercase tracking-wide text-steel mb-2">Scheduled battles</div>
+      <div class="space-y-1.5">${list}</div>
+    </div>
+  </div>`;
+}
 function snapBattleForm(){ if(!editing||editing.kind!=='battle') return; const g=id=>{const el=document.getElementById(id);return el?el.value:'';};
   editing.fighterId=g('bd_fighter')||editing.fighterId; editing.opponent=g('bd_opp'); editing.community=g('bd_comm'); editing.result=g('bd_result')||editing.result; editing.score=g('bd_score'); editing.platform=g('bd_plat'); const ts=new Date(g('bd_date')).getTime(); if(!isNaN(ts)) editing.date=ts; editing.link=g('bd_link'); editing.note=g('bd_note'); }
 function uploadOpp(input){ const file=input&&input.files&&input.files[0]; if(!file) return; if(!/^image\//.test(file.type)){ toast('Pick an image','bad'); return; }
@@ -2310,10 +2349,11 @@ function viewBattles(){
       ${statCard('spark','Draws', draws, '#FFC83D')}
     </div>
     ${battleCalendar()}
-    <div class="flex items-center justify-between mb-3 flex-wrap gap-2"><h3 class="font-display text-xl">Battle Log</h3><button onclick="newBattle()" class="text-xs px-3 py-1.5 rounded-lg bg-gold/20 text-gold hover:bg-gold/30 font-semibold">+ Log a battle</button></div>
+    <div class="flex items-center justify-between mb-3 flex-wrap gap-2"><h3 class="font-display text-xl">Battle Log</h3><div class="flex gap-2">${isStaff?`<button onclick="openSchedule()" class="text-xs px-3 py-1.5 rounded-lg bg-orchid/20 text-orchid hover:bg-orchid/30 font-semibold">📅 Schedule battles</button>`:''}<button onclick="newBattle()" class="text-xs px-3 py-1.5 rounded-lg bg-gold/20 text-gold hover:bg-gold/30 font-semibold">+ Log a battle</button></div></div>
     <div class="flex gap-1.5 mb-4">${['all','Win','Loss','Draw'].map(r=>`<button onclick="battleFilter='${r}';render()" class="px-3 py-1.5 rounded-lg text-xs ${battleFilter===r?'tab-on':'bg-raised text-steel hover:text-chalk'}">${r==='all'?'All':r}</button>`).join('')}</div>
     <div class="grid sm:grid-cols-2 gap-3">${cards}</div>
     ${editorOverlay()}
+    ${scheduleOverlay()}
   `);
 }
 function ensureLore(u){ if(u._lore) return; u._lore=true; u.inbox=u.inbox||[];

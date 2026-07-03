@@ -484,12 +484,26 @@ function seed(){
     { slot:'Longest Streak', user:'RED_LEADER' },
   ];
   const store = [
-    { id:'s1', name:'Pick Your Color', cost:300, glyph:'\uD83C\uDFA8', desc:'Claim your ranger hue \u2014 your name color in Discord.' },
-    { id:'s2', name:'Pinned Mission', cost:500, glyph:'\uD83D\uDCCC', desc:'Your latest work pinned for a week.' },
-    { id:'s3', name:'Quartermaster Medal', cost:800, glyph:'\uD83C\uDF96\uFE0F', desc:'Wear the Quartermaster medal on your profile.' },
-    { id:'s4', name:'Free Design Review', cost:250, glyph:'\uD83D\uDCE3', desc:'A real 1:1 review of your branding or content with @monsieuraiii.' },
-    { id:'s5', name:'TikTok Feature', cost:600, glyph:'\u2728', desc:'Get shouted out / featured on @monsieuraiii\u2019s TikTok.' },
-    { id:'s6', name:'Early Mission Access', cost:400, glyph:'\u23F0', desc:'RSVP to missions 24h before everyone else.' },
+    { id:'s4', name:'Free Design Review', cost:250, glyph:'📣', desc:'A real 1:1 review of your branding or content with @monsieuraiii.' },
+    { id:'s7', name:'Buzz Shoutout', cost:250, glyph:'📢', desc:'The owner hypes your latest drop to the whole squad in The Buzz.' },
+    { id:'s1', name:'Pick Your Color', cost:300, glyph:'🎨', desc:'Claim your ranger hue — your name color across the House.' },
+    { id:'s8', name:'Custom Callsign Tag', cost:350, glyph:'🏷️', desc:'A custom title under your name — “The Closer”, “Combo King”, you pick.' },
+    { id:'s6', name:'Early Mission Access', cost:400, glyph:'⏰', desc:'RSVP to missions and battles 24h before everyone else.' },
+    { id:'s9', name:'Profile Banner', cost:450, glyph:'🖼️', desc:'Unlock a custom banner across the top of your profile.' },
+    { id:'s10', name:'VIP Comms Room', cost:500, glyph:'🔐', desc:'Access to the private strategy room with the owner and managers.' },
+    { id:'s2', name:'Pinned Mission', cost:550, glyph:'📌', desc:'Your latest work pinned to the top of the feed for a week.' },
+    { id:'s5', name:'TikTok Feature', cost:600, glyph:'✨', desc:'Get shouted out / featured on @monsieuraiii’s TikTok.' },
+    { id:'s11', name:'Priority Battle Slot', cost:650, glyph:'⚔️', desc:'First pick of the next battle you want — and featured as attending.' },
+    { id:'s12', name:'Ranger of the Week', cost:750, glyph:'🌟', desc:'Top spotlight on HQ for a full week, plus pinned in The Buzz.' },
+    { id:'s3', name:'Quartermaster Medal', cost:800, glyph:'🎖️', desc:'Wear the Quartermaster medal on your profile.' },
+    { id:'s13', name:'1:1 Strategy Call', cost:900, glyph:'📞', desc:'A 30-minute growth + content strategy call with @monsieuraiii.' },
+    { id:'s14', name:'Custom Graphic or Overlay', cost:1000, glyph:'🖌️', desc:'A real branded graphic or live-stream overlay, designed for you.' },
+    { id:'s15', name:'Link-in-Bio Audit', cost:1100, glyph:'🔍', desc:'A pro teardown of your site or link-in-bio with fixes you can use.' },
+    { id:'s16', name:'Collab Video', cost:1200, glyph:'🎬', desc:'A real duet / collab video with @monsieuraiii.' },
+    { id:'s17', name:'Guest on a House LIVE', cost:1400, glyph:'🎙️', desc:'Co-host a segment on a House of MUSE live stream.' },
+    { id:'s18', name:'Custom Suit Skin', cost:1600, glyph:'🦸', desc:'A one-of-one profile look designed just for you.' },
+    { id:'s19', name:'House Legend Status', cost:1800, glyph:'🏆', desc:'A permanent Hall of Legends entry and a unique legend badge.' },
+    { id:'s20', name:'Founding Ranger Crest', cost:2000, glyph:'👑', desc:'A permanent founding-member crest — top of the roster, forever.' },
   ];
   const announcements = [
     { id:'a1', title:'Season II: Suit Up', body:'New ranks, new medals, fresh leaderboard. Power carries over \u2014 your streak does not. Morph in today.', t:now-1*day },
@@ -1597,7 +1611,7 @@ function viewHall(){
 /* ---------- STORE ---------- */
 function viewStore(){
   const u=me(); const owned=(u.purchases||[]);
-  const rarOf=c=>c>=700?{n:'Legendary',c:'#FFC83D'}:c>=500?{n:'Epic',c:'#FF3D9A'}:c>=350?{n:'Rare',c:'#E12B38'}:{n:'Common',c:'#9B93AE'};
+  const rarOf=c=>c>=1600?{n:'Mythic',c:'#A78BFA'}:c>=900?{n:'Legendary',c:'#FFC83D'}:c>=550?{n:'Epic',c:'#FF3D9A'}:c>=350?{n:'Rare',c:'#E12B38'}:{n:'Common',c:'#9B93AE'};
   const card=s=>{ const own=owned.includes(s.id), aff=u.coins>=s.cost, r=rarOf(s.cost), rc=r.c, pct=Math.min(100,Math.round(u.coins/s.cost*100));
     return `<div class="relative overflow-hidden rounded-2xl p-4 flex flex-col hover-lift" style="background:linear-gradient(165deg, ${rc}14, #14121C 62%);border:1px solid ${own?'rgba(255,200,61,.5)':aff?rc+'66':'#2A2636'};${aff&&!own?'box-shadow:0 0 26px -12px '+rc:''}">
       <div class="absolute -top-10 -right-8 w-32 h-32 rounded-full blur-2xl pointer-events-none" style="background:${rc};opacity:.16"></div>
@@ -1632,7 +1646,7 @@ function viewStore(){
       </div>
     </div>`:'';
   const grid=DB.store.map(card).join('');
-  const earn=[['📅','Morph in daily','+10 Energy, more with streaks'],['🔥','Finish training drills','Energy on every drill'],['🎤','Join Comms rooms','+8 Energy, first join each day'],['🎯','Complete missions','Energy when you RSVP & show up']]
+  const earn=[['📅','Morph in daily','+10 Energy, more with streaks'],['🔥','Finish training drills','Energy on every drill'],['🎤','Join Comms rooms','+8 Energy, first join each day'],['🎯','Complete missions','Energy when you RSVP & show up'],['⚔️','RSVP & attend battles','Energy to RSVP, bonus when you show up']]
     .map(x=>`<div class="flex items-start gap-2.5 py-1.5"><span class="text-base leading-none mt-0.5">${x[0]}</span><div><div class="text-[12px] text-chalk">${x[1]}</div><div class="text-[11px] text-steel">${x[2]}</div></div></div>`).join('');
   app.innerHTML = shell(`
     ${banner('Spend what you earn','Store','Everything here unlocks with Energy you earn in the House — no purchases, ever. Owners can grant Energy too.')}

@@ -555,6 +555,9 @@ function seedRooms(){
 }
 if(!DB){ DB = seed(); save(); }
 if(DB && !DB.rooms){ DB.rooms = seedRooms(); save(); }
+/* Static catalogs live in code, not the cache — always refresh them on boot so
+   store/badges/etc. update the moment a new build ships. */
+try{ const _fresh=seed(); DB.store=_fresh.store; DB.badges=_fresh.badges; DB.links=DB.links&&DB.links.length?DB.links:_fresh.links; }catch(e){}
 if(DB && !DB.reactions) DB.reactions={};
 if(DB && DB.members){ DB.members.forEach(m=>{ if(m.freezes==null)m.freezes=1; m.pending=m.pending||[]; if(m.onboarded==null)m.onboarded=true; }); }
 if(DB && DB.members){ DB.members.forEach(m=>{ m.feed=m.feed||[]; m.inbox=m.inbox||[]; m.done=m.done||[]; m.rsvps=m.rsvps||[]; m.socials=m.socials||{tiktok:m.tiktok||'',instagram:'',youtube:'',x:'',twitch:'',discord:m.discord||'',website:''}; }); save(); }

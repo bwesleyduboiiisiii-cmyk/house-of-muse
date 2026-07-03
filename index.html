@@ -421,6 +421,26 @@ function earnBadge(u, key){
   u.feed=u.feed.slice(0,60); return true;
 }
 function awardCoins(u, amt, reason){ u.coins += amt; }
+function checkBadges(u){ if(!u) return false; const before=(u.badges||[]).length;
+  try{
+    const lvl=(typeof levelFromXP==='function')?levelFromXP(u.xp):1;
+    if(lvl>=3) earnBadge(u,'suited');
+    if(u.xp>=1000) earnBadge(u,'power_1k');
+    if(u.xp>=5000) earnBadge(u,'power_5k');
+    const spent=(DB.store||[]).filter(x=>(u.purchases||[]).includes(x.id)).reduce((a,b)=>a+b.cost,0);
+    if(spent>=2500) earnBadge(u,'big_spender');
+    const done=(u.done||[]).length; if(done>=5) earnBadge(u,'drill_5'); if(done>=15) earnBadge(u,'drill_15');
+    const myB=(DB.battles||[]).filter(b=>b.fighterId===u.id); if(myB.length>=1) earnBadge(u,'battle_first');
+    const wins=myB.filter(b=>b.result==='Win').length; if(wins>=5) earnBadge(u,'battle_win5'); if(wins>=15) earnBadge(u,'battle_win15');
+    if((u.rsvps||[]).length>=5) earnBadge(u,'reliable');
+    if((u.streak||0)>=60) earnBadge(u,'streak_60');
+    const posts=(DB.posts||[]).filter(p=>p.authorId===u.id).length; if(posts>=10) earnBadge(u,'voice');
+    if((u.purchases||[]).length>=5) earnBadge(u,'collector');
+    if((u.purchases||[]).includes('r11')) earnBadge(u,'vip');
+    if((u.purchases||[]).includes('r20')) earnBadge(u,'crowned');
+  }catch(e){}
+  return (u.badges||[]).length>before;
+}
 
 /* ---------- SEED CONTENT ---------- */
 function seed(){
@@ -474,6 +494,21 @@ function seed(){
     rank_legend:   { name:'Living Legend', glyph:'\uD83C\uDFC6', desc:'Reached the top rank: Legend.' },
     social_pro:    { name:'Fully Connected', glyph:'\uD83D\uDD17', desc:'Linked three or more socials.' },
     comms_caller:  { name:'On The Air', glyph:'\uD83C\uDF99\uFE0F', desc:'Jumped into a live Comms room.' },
+    suited:        { name:'Suited Up', glyph:'🥾', desc:'Reached Level 3.' },
+    power_1k:      { name:'Power Player', glyph:'💪', desc:'Banked 1,000 total Power.' },
+    power_5k:      { name:'Powerhouse', glyph:'🔋', desc:'Banked 5,000 total Power.' },
+    big_spender:   { name:'Big Spender', glyph:'💸', desc:'Spent 2,500 Energy in the Store.' },
+    drill_5:       { name:'Drill Sergeant', glyph:'🎯', desc:'Completed 5 training drills.' },
+    drill_15:      { name:'Grinder', glyph:'🏋️', desc:'Completed 15 training drills.' },
+    battle_first:  { name:'First Blood', glyph:'⚔️', desc:'Logged your first battle.' },
+    battle_win5:   { name:'Battle Hardened', glyph:'🥊', desc:'Won 5 battles.' },
+    battle_win15:  { name:'War Machine', glyph:'🏅', desc:'Won 15 battles.' },
+    reliable:      { name:'Reliable', glyph:'🙋', desc:'RSVP’d to 5 missions.' },
+    streak_60:     { name:'Iron Will', glyph:'🧱', desc:'Held a 60-day streak.' },
+    voice:         { name:'Voice of the House', glyph:'📢', desc:'Posted 10 times in The Buzz.' },
+    collector:     { name:'Collector', glyph:'🎁', desc:'Unlocked 5 Store rewards.' },
+    vip:           { name:'VIP', glyph:'🎟️', desc:'Held a VIP Creator Pass.' },
+    crowned:       { name:'Crowned', glyph:'👑', desc:'Earned House Legend status.' },
   };
   const hall = [
     { slot:'Ranger of the Week', user:'BlueByte' },
@@ -2685,6 +2720,7 @@ function onboardChecklist(u){
   </section>`;
 }
 function render(){
+  try{ const _cu=me&&me(); if(_cu && typeof checkBadges==='function' && checkBadges(_cu) && typeof save==='function') save(); }catch(e){}
   if(!DB.currentUserId || !me()){ viewLogin(); }
   else { (VIEWS[ROUTE]||viewDashboard)(); }
   try{ const u=me(); document.body.classList.toggle('no-anim', !!(u&&u.prefs&&u.prefs.animations===false)); }catch(e){}

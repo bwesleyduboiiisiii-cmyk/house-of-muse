@@ -1322,13 +1322,14 @@ async function addScheduled(){ const g=id=>{const e=document.getElementById(id);
   setTimeout(()=>{ const o=document.getElementById('sch_opp'); if(o) o.focus(); },0);
 }
 async function importSchedule(){ const ta=document.getElementById('sch_bulk'); const raw=(ta&&ta.value||'').trim(); if(!raw){ toast('Paste your schedule first','bad'); return; }
+  const fsel=document.getElementById('sch_fighter'); const fid=(fsel&&fsel.value)||me().id;
   const now=new Date(); const rows=[];
   raw.split(/\n+/).forEach(line=>{ line=line.trim(); if(!line || !/\d{1,2}\/\d{1,2}/.test(line)) return;
     const p=line.split('|').map(x=>x.trim()); if(p.length<3) return;
     const dm=p[0].match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/); if(!dm) return; const mo=+dm[1], da=+dm[2]; let yr=dm[3]?(+dm[3]<100?2000+ +dm[3]:+dm[3]):now.getFullYear();
     const tm=p[1].match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i); if(!tm) return; let hh=+tm[1]; const mm=+tm[2]; const ap=(tm[3]||'').toUpperCase(); if(ap==='PM'&&hh<12)hh+=12; if(ap==='AM'&&hh===12)hh=0;
     const when=new Date(yr,mo-1,da,hh,mm); if(isNaN(when.getTime())) return;
-    rows.push({ fighter_id:me().id, opponent:p[2]||'Unknown', community:'', result:'Scheduled', score:'', platform:'TikTok', battle_date:when.toISOString(), link:'', note:p[3]||'', opp_img:null });
+    rows.push({ fighter_id:fid, opponent:p[2]||'Unknown', community:'', result:'Scheduled', score:'', platform:'TikTok', battle_date:when.toISOString(), link:'', note:p[3]||'', opp_img:null });
   });
   if(!rows.length){ toast('Couldn\u2019t read any battles \u2014 check the format','bad'); return; }
   const btn=document.getElementById('sch_import'); if(btn){ btn.disabled=true; btn.textContent='Importing\u2026'; }

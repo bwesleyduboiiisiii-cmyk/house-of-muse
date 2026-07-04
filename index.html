@@ -414,7 +414,7 @@ const RANGER_COLORS = [
   {name:'White',hex:'#E6E9EF'},{name:'Gold',hex:'#D4AF37'},{name:'Silver',hex:'#AAB2C0'},
   {name:'Crimson',hex:'#E11D48'},{name:'Purple',hex:'#7C3AED'},{name:'Aqua',hex:'#22D3EE'},
 ];
-// NOTE: real Power Rangers series names — swap this list for original names for a commercial launch.
+// Team names — edit RANGER_SERIES freely to fit your own brand.
 const RANGER_SERIES = ['Mighty Morphin','Zeo','Turbo','In Space','Lost Galaxy','Lightspeed Rescue','Time Force','Wild Force','Ninja Storm','Dino Thunder','S.P.D.','Mystic Force','Operation Overdrive','Jungle Fury','RPM','Samurai','Megaforce','Dino Charge','Ninja Steel','Beast Morphers','Dino Fury','Cosmic Fury'];
 function colorHex(name){ const c=RANGER_COLORS.find(x=>x.name===name); return c?c.hex:'#9B93AE'; }
 function comboTaken(color,series,exceptId){ return DB.members.some(m=>m.id!==exceptId && m.color===color && m.series===series); }
@@ -2132,7 +2132,7 @@ function viewRooms(){
         <div class="flex items-center">${stack}<span class="text-[11px] text-steel ml-2">often here</span></div>
         <div class="flex gap-2">
           <button onclick="enterRoom('${r.id}','audio')" class="text-xs px-3 py-1.5 rounded-lg bg-raised border border-line text-silver hover:border-orchid hover:text-orchid flex items-center gap-1.5">${ICON.mic.replace('w-full h-full','w-3.5 h-3.5')} Audio</button>
-          <button onclick="enterRoom('${r.id}','video')" class="text-xs px-3 py-1.5 rounded-lg bg-orchid/20 text-orchid hover:bg-orchid/30 flex items-center gap-1.5">${ICON.video.replace('w-full h-full','w-3.5 h-3.5')} Video</button>
+          <button onclick="enterRoom('${r.id}','video')" class="text-xs px-3 py-1.5 rounded-lg bg-orchid/20 text-orchid hover:bg-orchid/30 flex items-center gap-1.5">${ICON.video.replace('w-full h-full','w-3.5 h-3.5')} Video</button>${u&&u.role==='Owner'?`<button onclick="deleteRoom('${r.id}')" title="Delete room" class="text-xs px-2 py-1.5 rounded-lg bg-raised border border-line text-steel hover:text-rose">✕</button>`:''}
         </div>
       </div>
     </div>`;
@@ -2629,9 +2629,9 @@ function viewBattles(){
   `);
 }
 function ensureLore(u){ if(u._lore) return; u._lore=true; u.inbox=u.inbox||[];
-  [{from:'Zordon (HQ)',text:'A new mission has been assigned to your squad. Review the briefing and prepare. The Power is in your hands.'},
-   {from:'Alpha 5',text:'Ay-yi-yi! A new training module is unlocked, Ranger. Head to the Academy and power up.'},
-   {from:'Lord Drakkon',text:'I challenge the House of MUSE to prove its strength. Rise to it — if you can.'}]
+  [{from:'🔮 The Oracle',text:'A new mission awaits the squad. Review the briefing and rise to it — the House is counting on you.'},
+   {from:'🤖 Sentinel',text:'New training module online, ranger. Report to the Training deck and power up.'},
+   {from:'The Rival',text:'I challenge the House of MUSE to prove its strength. Rise to it — if you can.'}]
    .forEach((l,idx)=>u.inbox.push({id:'lore_'+idx, type:'message', from:l.from, text:l.text, t:Date.now()-(idx+1)*3600000, read:false}));
   save();
 }
@@ -3140,6 +3140,7 @@ async function saveChallengeForm(){ const g=id=>{const e=document.getElementById
 async function deleteEvent(id){ if(!confirm('Delete this mission?')) return; if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)){ DB.events=(DB.events||[]).filter(e=>e.id!==id); editing=null; render(); toast('Removed'); return; } const { error } = await sb.from('events').delete().eq('id',id); if(error){ toast(error.message,'bad'); return; } editing=null; await loadContent(); render(); toast('Mission deleted','gold'); }
 async function deleteChallenge(id){ if(!confirm('Delete this drill?')) return; if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)){ DB.challenges=(DB.challenges||[]).filter(c=>c.id!==id); editing=null; render(); toast('Removed'); return; } const { error } = await sb.from('challenges').delete().eq('id',id); if(error){ toast(error.message,'bad'); return; } editing=null; await loadContent(); render(); toast('Drill deleted','gold'); }
 async function createRoom(){ const name=(prompt('Name your room')||'').trim(); if(!name) return; const topic=(prompt('One-line topic (optional)')||'').trim(); const accents=['#E12B38','#2563EB','#FFC83D','#16A34A','#FF3D9A']; const { error } = await sb.from('rooms').insert({name, topic:topic||'A new room in the House.', accent:accents[(DB.rooms||[]).length%accents.length]}); if(error){ toast('Failed: '+error.message,'bad'); return; } await loadContent(); render(); toast('Channel created','gold'); }
+async function deleteRoom(id){ if(!confirm('Delete this room?')) return; if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)){ DB.rooms=(DB.rooms||[]).filter(r=>r.id!==id); render(); toast('Room removed'); return; } const { error } = await sb.from('rooms').delete().eq('id',id); if(error){ toast(error.message,'bad'); return; } await loadContent(); render(); toast('Room deleted','gold'); }
 function uploadPic(input, kind){
   const file=input&&input.files&&input.files[0]; if(!file) return;
   if(!/^image\//.test(file.type)){ toast('Pick an image file','bad'); return; }

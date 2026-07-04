@@ -326,6 +326,11 @@ async function provisionGoddess(user){
   try{ const { error } = await sb.from('profiles').insert(row); if(error && !/duplicate|exists|violat|constraint/i.test(error.message)){ toast('Guest setup: '+error.message,'bad'); console.error(error); } }catch(e){ console.error(e); }
   ROUTE='dashboard'; toast('Welcome, Goddess \u2728','gold'); await loadProfiles(user);
 }
+async function backToLogin(){
+  try{ if(window._sub){ sb.removeChannel(window._sub); window._sub=null; } await sb.auth.signOut(); }catch(e){}
+  window._signupName=''; window._goddessProvision=false; pendingAuthUser=null; DB.currentUserId=null;
+  AUTHVIEW='signin'; AUTHMODE='signin'; viewLogin();
+}
 async function createAccount(){
   const name=(document.getElementById('auth_user').value||'').trim();
   const code=(document.getElementById('auth_code').value||'').trim();
@@ -881,6 +886,7 @@ function renderAuth(mode){
       <div id="rangerPicker" class="mb-5"></div>
       <button onclick="createRanger()" class="sheen w-full py-3.5 rounded-xl font-bold tracking-wide text-ink bg-gradient-to-b from-[#ff5a4d] to-orchid hover:brightness-110 transition text-base">SUIT UP ⚡</button>
       <div id="rangerStatus" class="mt-3 text-center"></div>
+      <button onclick="backToLogin()" class="mt-4 w-full text-center text-[12px] text-steel hover:text-orchid">← Already a member? Sign in</button>
     </div>`;
     renderRangerPicker('signup');
     return;

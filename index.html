@@ -279,8 +279,8 @@ async function loadProfiles(user){ if(_profLoading) return; _profLoading=true;
     if(res.error){ toast('Could not load squad: '+(res.error.message||res.error),'bad'); console.error(res.error); }
     DB.members=(res.data||[]).map(rowToMember);
     const mine=DB.members.find(m=>m.id===user.id);
-    if(!mine){ pendingAuthUser=user; AUTHVIEW='onboard'; DB.currentUserId=null; viewLogin(); return; }
-    DB.currentUserId=user.id; pendingAuthUser=null; AUTHVIEW=null;
+    if(!mine){ if(window._goddessProvision){ window._goddessProvision=false; _profLoading=false; await provisionGoddess(user); return; } pendingAuthUser=user; AUTHVIEW='onboard'; DB.currentUserId=null; viewLogin(); return; }
+    window._goddessProvision=false; DB.currentUserId=user.id; pendingAuthUser=null; AUTHVIEW=null;
     if(!ROUTE) ROUTE='dashboard';
     await loadConfig(); await loadContent();
     render(); subscribeProfiles(); subscribeContent();
@@ -311,15 +311,20 @@ async function goddessLogin(){
   if(!sb){ toast('Supabase not loaded','bad'); return; }
   const NAME='Goddess', CODE='7777';
   const btn=document.getElementById('goddess_btn'); if(btn){ btn.disabled=true; btn.textContent='Entering\u2026'; }
+  ROUTE='dashboard'; window._goddessProvision=true;
   const { error } = await sb.auth.signInWithPassword({ email:_authEmail(NAME), password:_authPass(CODE) });
-  if(!error) return; // signed in \u2014 the auth listener loads the app
-  // first time only: provision the guest account, then she picks her look once
-  window._signupName=NAME;
+  if(!error) return; // existing guest \u2014 auth listener loads HQ (provisions if no profile)
   const { data, error:e2 } = await sb.auth.signUp({ email:_authEmail(NAME), password:_authPass(CODE) });
-  if(e2){ if(btn){ btn.disabled=false; btn.textContent='\uD83D\uDC51 GODDESS'; }
+  if(e2){ window._goddessProvision=false; if(btn){ btn.disabled=false; btn.textContent='\uD83D\uDC51 GODDESS'; }
     toast(/registered|already|exists/i.test(e2.message)?'Guest is set up \u2014 tap GODDESS again to enter.':e2.message,'bad'); return; }
-  if(!data.session){ if(btn){ btn.disabled=false; btn.textContent='\uD83D\uDC51 GODDESS'; }
-    toast('Owner: turn OFF \u201CConfirm email\u201D in Supabase \u2192 Authentication \u2192 Email to enable guest access.','bad'); }
+  if(!data.session||!data.user){ window._goddessProvision=false; if(btn){ btn.disabled=false; btn.textContent='\uD83D\uDC51 GODDESS'; }
+    toast('Owner: turn OFF \u201CConfirm email\u201D in Supabase \u2192 Authentication \u2192 Email to enable guest access.','bad'); return; }
+  await loadProfiles(data.user);
+}
+async function provisionGoddess(user){
+  const row={ id:user.id, username:'Goddess', tiktok:'@goddess', discord:'goddess', bio:'Special guest of the House. \u2728', coins:100, color:'Pink', series:'Guest', role:'Member', socials:{tiktok:'@goddess',instagram:'',youtube:'',x:'',twitch:'',discord:'goddess',website:''} };
+  try{ const { error } = await sb.from('profiles').insert(row); if(error && !/duplicate|exists|violat|constraint/i.test(error.message)){ toast('Guest setup: '+error.message,'bad'); console.error(error); } }catch(e){ console.error(e); }
+  ROUTE='dashboard'; toast('Welcome, Goddess \u2728','gold'); await loadProfiles(user);
 }
 async function createAccount(){
   const name=(document.getElementById('auth_user').value||'').trim();

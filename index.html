@@ -2300,6 +2300,7 @@ function viewFeed(){
   const highlights=top.slice(0,4).map(m=>`<button onclick="openProfile('${m.id}')" class="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-raised text-left">${avatarOf(m,30,colorHex(m.color))}<div class="min-w-0 flex-1"><div class="text-[13px] text-chalk truncate">${esc(m.username)}</div><div class="text-[10px] text-steel">${m.color?esc(m.color)+' Ranger':''}</div></div><span class="font-mono text-[11px]" style="color:${colorHex(m.color)}">${fmt(m.xp)}</span></button>`).join('');
   const star=top[0];
   const _sc=colorHex(star&&star.color);
+  const ttHandle=star?String((star.socials&&star.socials.tiktok)||star.tiktok||'').replace(/^@+/,'').trim():'';
   const spotlight = star?`<div class="relative overflow-hidden">
       <div class="absolute inset-x-0 -top-12 h-28 blur-2xl pointer-events-none" style="background:radial-gradient(circle at 50% 0, ${_sc}66, transparent 70%)"></div>
       <div class="relative text-center">
@@ -2313,6 +2314,7 @@ function viewFeed(){
         </div>
         <p class="text-[12px] text-silver line-clamp-3">${esc(star.bio||'Leading the House.')}</p>
         <button onclick="openProfile('${star.id}')" class="mt-3 w-full text-[12px] px-3 py-2 rounded-lg font-bold text-ink hover:brightness-110 transition" style="background:linear-gradient(180deg, ${_sc}, ${_sc}cc);box-shadow:0 8px 20px -10px ${_sc}">View profile</button>
+        ${ttHandle?`<a href="https://www.tiktok.com/@${ttHandle}" target="_blank" rel="noopener" class="mt-2 w-full inline-flex items-center justify-center gap-2 text-[12px] px-3 py-2 rounded-lg bg-ink/60 border border-line text-chalk hover:border-orchid transition"><svg viewBox="0 0 24 24" class="w-4 h-4" fill="currentColor"><path d="M16.5 3c.3 2.1 1.6 3.8 3.7 4.1v2.5c-1.2 0-2.4-.4-3.6-1.1v6c0 3-2.4 5.5-5.5 5.5A5.5 5.5 0 0 1 5.6 9.9c.3 0 .7 0 1 .1v2.6a2.9 2.9 0 1 0 2 2.8V3h1.9z"/></svg>@${ttHandle} on TikTok</a><div class="mt-4"><div class="text-[10px] uppercase tracking-[.15em] text-steel mb-2 text-left">Latest on TikTok</div><blockquote class="tiktok-embed" cite="https://www.tiktok.com/@${ttHandle}" data-unique-id="${ttHandle}" data-embed-type="creator" style="max-width:100%;min-width:288px;margin:0 auto"><section><a target="_blank" href="https://www.tiktok.com/@${ttHandle}">@${ttHandle}</a></section></blockquote></div><div class="text-[10px] text-steel mt-2 text-left">Tap a video to watch \u2014 hit <span class="text-chalk font-semibold">Follow</span> on TikTok if you don\u2019t already.</div>`:''}
       </div>
     </div>`:'';
   app.innerHTML = shell(`
@@ -2325,8 +2327,10 @@ function viewFeed(){
       </div>
     </div>
   `);
+  if(ttHandle) loadTikTok();
 }
 var lbScope='all';
+function loadTikTok(){ try{ const old=document.getElementById('ttembed'); if(old) old.remove(); const sc=document.createElement('script'); sc.id='ttembed'; sc.async=true; sc.src='https://www.tiktok.com/embed.js'; document.body.appendChild(sc); }catch(e){} }
 function growthFeed(m){
   const items=(m.feed||[]).slice(0,18);
   if(!items.length) return `<div class="text-sm text-steel py-4">No recent activity yet \u2014 morph in to start your feed.</div>`;

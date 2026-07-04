@@ -2309,17 +2309,19 @@ function feedComposer(){ const u=me(); const d=postDraft;
     </div>
   </section>`;
 }
+function togglePin(id){ const u=me(); if(!u||(u.role!=='Owner'&&u.role!=='Manager')){ toast('Owners & managers only','bad'); return; } DB.app_config=DB.app_config||{}; const cur=DB.app_config.pinnedPost||null; DB.app_config.pinnedPost=(cur===id)?null:id; try{ sb.from('app_config').upsert({id:1,data:DB.app_config}).then(x=>{ if(x&&x.error) toast('Pin save failed: '+x.error.message,'bad'); }); }catch(e){} render(); toast(DB.app_config.pinnedPost?'Pinned to top \U0001F4CC':'Unpinned','gold'); }
 function postCard(p){ const u=me(); const a=DB.members.find(m=>m.id===p.authorId); if(!a) return '';
+  const pinnedId=(DB.app_config&&DB.app_config.pinnedPost)||null; const isPinned=pinnedId===p.id; const staff=!!(u&&(u.role==='Owner'||u.role==='Manager'));
   const canDel = u.id===p.authorId || u.role==='Owner';
   let pollHTML='';
   if(p.poll){ const total=p.poll.opts.reduce((s,o)=>s+o.votes.length,0);
     pollHTML=`<div class="mt-2 space-y-1.5">${p.poll.opts.map((o,i)=>{ const pct=total?Math.round(o.votes.length/total*100):0; const mine=o.votes.includes(u.id);
       return `<button onclick="votePoll('${p.id}',${i})" class="w-full relative overflow-hidden rounded-lg border ${mine?'border-orchid':'border-line'}"><div class="absolute inset-y-0 left-0" style="width:${pct}%;background:${mine?'rgba(225,43,56,.22)':'rgba(155,147,174,.14)'}"></div><div class="relative flex items-center justify-between px-3 py-2 text-[13px]"><span class="${mine?'text-chalk':'text-silver'}">${esc(o.t)}</span><span class="text-steel font-mono text-[11px]">${pct}%</span></div></button>`; }).join('')}<div class="text-[10px] text-steel">${total} vote${total===1?'':'s'}</div></div>`;
   }
-  return `<div class="bg-panel border border-line rounded-2xl p-4">
+  return `<div class="bg-panel border ${isPinned?'border-gold/40':'border-line'} rounded-2xl p-4">
     <div class="flex items-start gap-3"><button onclick="openProfile('${a.id}')" class="shrink-0">${avatarOf(a,38,colorHex(a.color))}</button>
       <div class="min-w-0 flex-1">
-        <div class="flex items-center justify-between gap-2"><div class="text-[13px]"><button onclick="openProfile('${a.id}')" class="font-semibold text-chalk hover:text-orchid">${esc(a.username)}</button> <span class="text-steel text-[11px]">· ${timeAgo(p.t)}</span></div>${canDel?`<button onclick="deletePost('${p.id}')" class="text-steel hover:text-rose text-[11px] shrink-0">Delete</button>`:''}</div>
+        <div class="flex items-center justify-between gap-2"><div class="text-[13px]"><button onclick="openProfile('${a.id}')" class="font-semibold text-chalk hover:text-orchid">${esc(a.username)}</button> <span class="text-steel text-[11px]">· ${timeAgo(p.t)}</span>${isPinned?' <span class="text-[10px] font-bold text-gold">\U0001F4CC PINNED</span>':''}</div><div class="flex items-center gap-2 shrink-0">${staff?`<button onclick="togglePin('${p.id}')" class="text-steel hover:text-gold text-[11px]">${isPinned?'Unpin':'Pin'}</button>`:''}${canDel?`<button onclick="deletePost('${p.id}')" class="text-steel hover:text-rose text-[11px]">Delete</button>`:''}</div></div>
         ${p.text?`<p class="text-[14px] text-silver mt-1 whitespace-pre-wrap leading-snug">${esc(p.text)}</p>`:''}
         ${p.img?`<img src="${p.img}" alt="" class="mt-2 rounded-xl border border-line max-h-80 w-auto"/>`:''}
         ${pollHTML}
@@ -2330,7 +2332,10 @@ function postCard(p){ const u=me(); const a=DB.members.find(m=>m.id===p.authorId
 }
 function viewFeed(){
   DB.posts=DB.posts||[];
-  const postsHTML=(DB.posts||[]).slice(0,30).map(postCard).join('');
+  const pinnedId=(DB.app_config&&DB.app_config.pinnedPost)||null;
+  let plist=(DB.posts||[]).slice(0,30);
+  if(pinnedId){ const pp=(DB.posts||[]).find(x=>x.id===pinnedId); if(pp){ plist=[pp,...plist.filter(x=>x.id!==pinnedId)]; } }
+  const postsHTML=plist.map(postCard).join('');
   const all=[]; DB.members.forEach(m=>(m.feed||[]).forEach(it=>all.push({m,it})));
   all.sort((a,b)=>b.it.t-a.it.t);
   const rows = all.length ? all.slice(0,40).map(({m,it})=>`

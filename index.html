@@ -1494,26 +1494,31 @@ async function addScheduled(){ const g=id=>{const e=document.getElementById(id);
 }
 async function importSchedule(){ const ta=document.getElementById('sch_bulk'); const raw=(ta&&ta.value||'').trim(); if(!raw){ toast('Paste your schedule first','bad'); return; }
   const fsel=document.getElementById('sch_fighter'); const fid=(fsel&&fsel.value)||me().id;
-  const now=new Date(); const rows=[];
-  raw.split(/\n+/).forEach(line=>{ line=line.replace(/\r/g,'').trim(); if(!line || !/\d{1,2}\/\d{1,2}/.test(line)) return;
-    let date,timeStr,opp,dia,pow,adult,agency;
-    if(line.includes('|')){ const p=line.split('|').map(x=>x.trim()); date=p[0]; timeStr=p[1]; opp=p[2]; agency=p[3]; dia=p[4]; pow=p[5]; adult=p[6]; }
+  const now=new Date(); const rows=[]; let lastWhen=null, skipped=0;
+  raw.split(/\n+/).forEach(line=>{ line=line.replace(/\r/g,'').trim(); if(!line) return;
+    let date='',timeStr='',opp='',dia='',pow='',adult='',agency='';
+    if(line.includes('|')){ const p=line.split('|').map(x=>x.trim()); date=p[0]||''; timeStr=p[1]||''; opp=p[2]||''; agency=p[3]||''; dia=p[4]||''; pow=p[5]||''; adult=p[6]||''; }
     else {
       const cells=line.split('\t').map(x=>x.trim());
-      date=cells.find(c=>/\d{1,2}\/\d{1,2}/.test(c))||cells[0];
+      date=cells.find(c=>/\d{1,2}\/\d{1,2}/.test(c))||'';
       const times=cells.filter(c=>/\d{1,2}:\d{2}\s*(AM|PM)?/i.test(c));
-      timeStr=times[0]||'8:00 PM';
-      const lti = times.length ? cells.lastIndexOf(times[times.length-1]) : 0;
+      timeStr=times[0]||'';
+      const lti = times.length ? cells.lastIndexOf(times[times.length-1]) : (date?cells.indexOf(date):-1);
       const rest=cells.slice(lti+1).map(x=>x.trim()).filter(x=>x && x!=='\u2014' && x!=='-');
-      opp=rest[0]; dia=rest[1]; pow=rest[2]; adult=rest[3]; agency=(rest.length>1)?rest[rest.length-1]:'';
+      opp=rest[0]||''; dia=rest[1]||''; pow=rest[2]||''; adult=rest[3]||''; agency=(rest.length>1)?rest[rest.length-1]:'';
     }
-    const dm=String(date).match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/); if(!dm) return; const mo=+dm[1], da=+dm[2]; let yr=dm[3]?(+dm[3]<100?2000+ +dm[3]:+dm[3]):now.getFullYear();
-    const tm=String(timeStr).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i); let hh=20,mm=0; if(tm){ hh=+tm[1]; mm=+tm[2]; const ap=(tm[3]||'').toUpperCase(); if(ap==='PM'&&hh<12)hh+=12; if(ap==='AM'&&hh===12)hh=0; }
-    const when=new Date(yr,mo-1,da,hh,mm); if(isNaN(when.getTime())) return;
+    const dm=String(date).match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+    const tm=String(timeStr).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if(!dm && !tm && !opp) return;                 // blank / header-ish line
+    let hh=20,mm=0; if(tm){ hh=+tm[1]; mm=+tm[2]; const ap=(tm[3]||'').toUpperCase(); if(ap==='PM'&&hh<12)hh+=12; if(ap==='AM'&&hh===12)hh=0; }
+    let when=null;
+    if(dm){ const mo=+dm[1], da=+dm[2]; let yr=dm[3]?(+dm[3]<100?2000+ +dm[3]:+dm[3]):now.getFullYear(); when=new Date(yr,mo-1,da,hh,mm); lastWhen=when; }
+    else if(lastWhen){ when=new Date(lastWhen.getFullYear(),lastWhen.getMonth(),lastWhen.getDate(),hh,mm); }   // same day as the row above (blank date cell)
+    if(!when || isNaN(when.getTime()) || !opp){ skipped++; return; }   // not a real battle row
     const nt=[dia?('Diamonds: '+dia):'', pow?('Power-Ups: '+pow):'', adult?('18+: '+adult):''].filter(Boolean).join(' \u00b7 ');
     rows.push({ fighter_id:fid, opponent:opp||'Unknown', community:agency||'', result:'Scheduled', score:'', platform:'TikTok', battle_date:when.toISOString(), link:'', note:nt, opp_img:null });
   });
-  if(!rows.length){ toast('Couldn\u2019t read any battles \u2014 check the format','bad'); return; }
+  if(!rows.length){ toast('Couldn\u2019t read any battles \u2014 copy the rows straight from your sheet so each battle is on its own line','bad'); return; }
   const btn=document.getElementById('sch_import'); if(btn){ btn.disabled=true; btn.textContent='Importing\u2026'; }
   const { error } = await sb.from('battles').insert(rows);
   if(error){ toast('Import failed: '+error.message,'bad'); if(btn){ btn.disabled=false; btn.textContent='Import all'; } return; }

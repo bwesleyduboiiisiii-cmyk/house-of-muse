@@ -438,6 +438,16 @@ function checkBadges(u){ if(!u) return false; const before=(u.badges||[]).length
     if((u.purchases||[]).length>=5) earnBadge(u,'collector');
     if((u.purchases||[]).includes('r11')) earnBadge(u,'vip');
     if((u.purchases||[]).includes('r20')) earnBadge(u,'crowned');
+    if(u.xp>=10000) earnBadge(u,'power_10k');
+    if(lvl>=10) earnBadge(u,'level_10');
+    if(done>=30) earnBadge(u,'drill_30');
+    if(wins>=30) earnBadge(u,'battle_win30');
+    if((u.streak||0)>=90) earnBadge(u,'streak_90');
+    if(posts>=50) earnBadge(u,'poster_50');
+    if((u.coins||0)>=2000) earnBadge(u,'energy_rich');
+    if((u.purchases||[]).length>=10) earnBadge(u,'collector_10');
+    if((u.purchases||[]).includes('r12')) earnBadge(u,'champion');
+    if((u.purchases||[]).includes('r19')) earnBadge(u,'guardian');
   }catch(e){}
   return (u.badges||[]).length>before;
 }
@@ -509,6 +519,16 @@ function seed(){
     collector:     { name:'Collector', glyph:'🎁', desc:'Unlocked 5 Store rewards.' },
     vip:           { name:'VIP', glyph:'🎟️', desc:'Held a VIP Creator Pass.' },
     crowned:       { name:'Crowned', glyph:'👑', desc:'Earned House Legend status.' },
+    power_10k:     { name:'Ascendant', glyph:'🚀', desc:'Banked 10,000 total Power.' },
+    level_10:      { name:'Veteran', glyph:'🪖', desc:'Reached Level 10.' },
+    drill_30:      { name:'Relentless', glyph:'⚙️', desc:'Completed 30 training drills.' },
+    battle_win30:  { name:'Ring Legend', glyph:'🏆', desc:'Won 30 battles.' },
+    streak_90:     { name:'Unstoppable', glyph:'💯', desc:'Held a 90-day streak.' },
+    poster_50:     { name:'Broadcaster', glyph:'📻', desc:'Posted 50 times in The Buzz.' },
+    energy_rich:   { name:'Loaded', glyph:'💰', desc:'Held 2,000+ Energy at once.' },
+    collector_10:  { name:'Completionist', glyph:'🗃️', desc:'Unlocked 10 Store rewards.' },
+    champion:      { name:'Champion', glyph:'🎗️', desc:'Held Community Champion status.' },
+    guardian:      { name:'Guardian', glyph:'🛡️', desc:'Held Guardian of the House.' },
   };
   const hall = [
     { slot:'Ranger of the Week', user:'BlueByte' },
@@ -1372,7 +1392,20 @@ function saveChallengeForm(){
   editing=null; save(); render(); toast('Drill saved','gold');
 }
 function deleteChallenge(id){ if(!confirm('Delete this drill? It is removed from everyone\u2019s progress.')) return; DB.challenges=DB.challenges.filter(c=>c.id!==id); DB.members.forEach(m=>{ m.done=(m.done||[]).filter(x=>x!==id); m.pending=(m.pending||[]).filter(p=>p.ref!==id); }); editing=null; save(); render(); toast('Drill deleted'); }
-var battleFilter='all'; var calMonth=0, calSel=0; var scheduleOpen=false; var attnBattle=null; var RSVP_ENERGY=15, ATTEND_POWER=50, ATTEND_ENERGY=25;
+var battleFilter='all'; var calMonth=0, calSel=0; var scheduleOpen=false; var attnBattle=null; var grantMember=null; var RSVP_ENERGY=15, ATTEND_POWER=50, ATTEND_ENERGY=25;
+function openGrant(id){ grantMember=id; render(); setTimeout(()=>{ const a=document.getElementById('grant_amt'); if(a) a.focus(); },0); }
+function closeGrant(){ grantMember=null; render(); }
+function applyGrant(){ const u=me(); if(!u||u.role!=='Owner'){ toast('Only the Owner can grant','bad'); return; } const m=DB.members.find(x=>x.id===grantMember); if(!m) return;
+  const amt=parseInt((document.getElementById('grant_amt')||{}).value); const type=((document.getElementById('grant_type')||{}).value)||'Power';
+  if(!amt||amt<=0){ toast('Enter an amount','bad'); return; }
+  if(type==='Energy'){ awardCoins(m,amt,'Owner grant'); } else { awardXP(m,amt,'Owner grant'); }
+  m.feed=m.feed||[]; m.feed.unshift({g:'⚡',title:'Received '+amt+' '+type,sub:'Granted by HQ',t:Date.now()});
+  pushInbox(m.id,'message','⚡ You received '+amt+' '+type+' from HQ!');
+  upsertOther(m); grantMember=null; render(); toast('Gave '+m.username+' '+amt+' '+type,'gold');
+}
+function grantOverlay(){ if(!grantMember) return ''; const m=DB.members.find(x=>x.id===grantMember); if(!m) return ''; const IN2='w-full bg-raised border border-line rounded-xl px-3 py-2.5 text-sm text-chalk focus:border-orchid outline-none';
+  return `<div class="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onclick="if(event.target===this)closeGrant()"><div class="bg-panel border border-line w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl p-5"><div class="flex items-center justify-between mb-1"><h3 class="font-display text-xl">Grant to ${esc(m.username)}</h3><button onclick="closeGrant()" class="text-steel hover:text-chalk text-2xl leading-none">×</button></div><p class="text-[12px] text-steel mb-4">Give a custom amount of Power or Energy.</p><div class="grid grid-cols-2 gap-3 mb-4"><div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Amount</label><input id="grant_amt" type="number" min="1" placeholder="500" onkeydown="if(event.key==='Enter')applyGrant()" class="${IN2}"></div><div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Type</label><select id="grant_type" class="${IN2}"><option>Power</option><option>Energy</option></select></div></div><button onclick="applyGrant()" class="w-full py-3 rounded-xl font-bold text-ink bg-gradient-to-b from-[#ff5a4d] to-orchid hover:brightness-110">Grant</button></div></div>`;
+}
 function battleRsvpData(id){ DB.reactions=DB.reactions||{}; const k='br:'+id; const d=DB.reactions[k]=DB.reactions[k]||{}; d.rsvp=d.rsvp||{}; d.attended=d.attended||{}; d.paidR=d.paidR||{}; d.paidA=d.paidA||{}; return d; }
 async function saveBattleRsvp(id){ try{ const k='br:'+id; const { error } = await sb.from('reactions').upsert({key:k, data:DB.reactions[k]}); if(error) console.warn('rsvp save', error.message); }catch(e){} }
 async function rsvpBattle(id){ const u=me(); const d=battleRsvpData(id); if(d.rsvp[u.id]){ toast('You already RSVP’d','bad'); return; } d.rsvp[u.id]=Date.now(); let gained=0; if(!d.paidR[u.id]){ d.paidR[u.id]=true; awardCoins(u,RSVP_ENERGY,'RSVP: battle'); gained=RSVP_ENERGY; } render(); await saveBattleRsvp(id); upsertProfile(u); toast(gained?('You’re in — +'+gained+' Energy ⚡'):'You’re in','gold'); }
@@ -1847,7 +1880,7 @@ function viewAdmin(){
         ${me_?'<span class="text-steel/40 text-[11px]">you</span>':`
           <button onclick="sendNudge('${m.id}')" title="Send a check-in reminder" class="text-[11px] px-2 py-1 rounded bg-gold/15 text-gold hover:bg-gold/25">Nudge</button>
           <button onclick="sendMessage('${m.id}')" title="Send a message" class="text-[11px] px-2 py-1 rounded bg-orchid/15 text-orchid hover:bg-orchid/25">Message</button>
-          ${isOwner?`<button onclick="bump('${m.id}')" title="Grant +250 Power" class="text-[11px] px-2 py-1 rounded bg-raised text-steel hover:text-chalk">+250</button><button onclick="giveEnergy('${m.id}')" title="Grant +100 Energy" class="text-[11px] px-2 py-1 rounded bg-gold/15 text-gold hover:bg-gold/25">+100⚡</button>`:''}${isOwner?`<select onchange="setRole('${m.id}',this.value)" title="Set role" class="ml-1 align-middle text-[11px] bg-raised border border-line rounded px-1.5 py-1 text-chalk focus:border-orchid outline-none"><option value="Member"${m.role==='Member'?' selected':''}>Member</option><option value="Manager"${m.role==='Manager'?' selected':''}>Manager</option><option value="Owner"${m.role==='Owner'?' selected':''}>Owner</option></select>`:''}
+          ${isOwner?`<button onclick="openGrant('${m.id}')" title="Give custom Power/Energy" class="text-[11px] px-2 py-1 rounded bg-orchid/20 text-orchid hover:bg-orchid/30 font-semibold">Grant</button><button onclick="bump('${m.id}')" title="Grant +250 Power" class="text-[11px] px-2 py-1 rounded bg-raised text-steel hover:text-chalk">+250</button><button onclick="giveEnergy('${m.id}')" title="Grant +100 Energy" class="text-[11px] px-2 py-1 rounded bg-gold/15 text-gold hover:bg-gold/25">+100⚡</button>`:''}${isOwner?`<select onchange="setRole('${m.id}',this.value)" title="Set role" class="ml-1 align-middle text-[11px] bg-raised border border-line rounded px-1.5 py-1 text-chalk focus:border-orchid outline-none"><option value="Member"${m.role==='Member'?' selected':''}>Member</option><option value="Manager"${m.role==='Manager'?' selected':''}>Manager</option><option value="Owner"${m.role==='Owner'?' selected':''}>Owner</option></select>`:''}
         `}
       </td>
     </tr>`;
@@ -2725,6 +2758,7 @@ function render(){
   else { (VIEWS[ROUTE]||viewDashboard)(); }
   try{ const u=me(); document.body.classList.toggle('no-anim', !!(u&&u.prefs&&u.prefs.animations===false)); }catch(e){}
   if(typeof paletteOpen!=='undefined' && paletteOpen && typeof paletteOverlay==='function'){ try{ document.getElementById('app').insertAdjacentHTML('beforeend', paletteOverlay()); const inp=document.getElementById('palInput'); if(inp) inp.focus(); }catch(e){} }
+  try{ if(grantMember){ document.getElementById('app').insertAdjacentHTML('beforeend', grantOverlay()); } }catch(e){}
   if(window._celebrate){ const c=window._celebrate; window._celebrate=null; setTimeout(()=>celebrate(c.title,c.sub),60); }
 }
 (function(){ try{

@@ -258,7 +258,7 @@ function rowToMember(r){ const p=r.prefs||{};
     prefs:{ animations:p.animations!==false, nudges:p.nudges!==false, publicProfile:p.publicProfile!==false, sounds:!!p.sounds },
     rsvps:r.rsvps||[], done:r.done||[], inbox:r.inbox||[],
     joined_at: r.joined_at?new Date(r.joined_at).getTime():Date.now(),
-    feed:p._feed||[], xpLog:[], purchases:p._purchases||[], tag:p._tag||'', _ttvideo:p._ttvideo||'', perks:p._perks||{}, boostNext:!!p._boostNext, questDone:p._questDone||{}, roomLog:[], freezes:1, pending:p._pending||[], onboarded:true,
+    feed:p._feed||[], xpLog:[], purchases:p._purchases||[], tag:p._tag||'', _ttvideo:p._ttvideo||'', _spotDay:p._spotDay||'', perks:p._perks||{}, boostNext:!!p._boostNext, questDone:p._questDone||{}, roomLog:[], freezes:1, pending:p._pending||[], onboarded:true,
     _lore:!!p._lore, _hideChecklist:!!p._hideChecklist };
 }
 function memberToRow(u){ const pr=u.prefs||{};
@@ -268,7 +268,7 @@ function memberToRow(u){ const pr=u.prefs||{};
     avatar_url:u.avatarImg||null, banner_url:u.bannerImg||null,
     badges:u.badges||[], socials:u.socials||{},
     prefs:{ animations:pr.animations!==false, nudges:pr.nudges!==false, publicProfile:pr.publicProfile!==false, sounds:!!pr.sounds,
-            _last_checkin:u.last_checkin||null, _purchases:u.purchases||[], _tag:u.tag||'', _ttvideo:u._ttvideo||'', _perks:u.perks||{}, _boostNext:!!u.boostNext, _feed:(u.feed||[]).slice(0,40), _questDone:u.questDone||{}, _pending:u.pending||[], _lore:!!u._lore, _hideChecklist:!!u._hideChecklist },
+            _last_checkin:u.last_checkin||null, _purchases:u.purchases||[], _tag:u.tag||'', _ttvideo:u._ttvideo||'', _spotDay:u._spotDay||'', _perks:u.perks||{}, _boostNext:!!u.boostNext, _feed:(u.feed||[]).slice(0,40), _questDone:u.questDone||{}, _pending:u.pending||[], _lore:!!u._lore, _hideChecklist:!!u._hideChecklist },
     rsvps:u.rsvps||[], done:u.done||[], inbox:u.inbox||[] };
 }
 function upsertProfile(u){ if(!u||!sb) return; sb.from('profiles').update(memberToRow(u)).eq('id',u.id).then(r=>{ if(r.error) console.warn('save', r.error.message); }); }
@@ -696,6 +696,11 @@ function activePerk(m,id){ if(!m||!(m.purchases||[]).includes(id)) return false;
 const PERK_STYLE=[['r20','LEGEND','#FFC83D'],['r19','GUARDIAN','#38BDF8'],['r12','CHAMPION','#FF3D9A'],['r11','VIP','#A78BFA'],['r15','RANGER','#22D3EE']];
 function topPerk(m){ if(!m) return null; for(const t of PERK_STYLE){ if(activePerk(m,t[0])) return {id:t[0],label:t[1],color:(t[0]==='r15'?colorHex(m.color):t[2])}; } return null; }
 function perkBadge(m){ const p=topPerk(m); return p?`<span class="text-[10px] font-bold px-2 py-0.5 rounded-full align-middle" style="background:${p.color}22;color:${p.color};box-shadow:inset 0 0 0 1px ${p.color}66">${p.label}</span>`:''; }
+function spotlightStarId(){ const t=[...(DB.members||[])].sort((a,b)=>b.xp-a.xp)[0]; return t?t.id:null; }
+function isFeatured(m){ return !!(m && spotlightStarId()===m.id); }
+function featuredChip(){ return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full align-middle" style="background:#FFC83D22;color:#FFC83D;box-shadow:inset 0 0 0 1px #FFC83D66">⭐ FEATURED</span>'; }
+function spotlightBonus(u){ try{ if(!u||spotlightStarId()!==u.id) return; const k=_dayKey(); if(u._spotDay===k) return; u._spotDay=k; awardXP(u,40,'Creator Spotlight bonus'); awardCoins(u,25,'Creator Spotlight bonus'); if(typeof save==='function') save(); }catch(e){} }
+function hypeStar(id){ const u=me(); if(!u) return; const key='hype:'+id; const k=_dayKey(); let r=(DB.reactions&&DB.reactions[key])||{count:0,day:k,by:[]}; if(r.day!==k){ r.day=k; r.by=[]; } if((r.by||[]).includes(u.id)){ toast('You already hyped today — back tomorrow \uD83D\uDD25','bad'); return; } r.by=(r.by||[]).concat(u.id); r.count=(r.count||0)+1; DB.reactions=DB.reactions||{}; DB.reactions[key]=r; try{ sb.from('reactions').upsert({key, data:r}).then(x=>{ if(x&&x.error) console.warn('hype',x.error.message); }); }catch(e){} const star=DB.members.find(m=>m.id===id); render(); toast('You hyped '+(star?star.username:'them')+'! \uD83D\uDD25','gold'); }
 function hqSpotlight(){ const F=(arr,label,color,glyph)=>arr.length?arr.map(m=>`<button onclick="openProfile('${m.id}')" class="flex items-center gap-2 px-3 py-2 rounded-xl bg-raised/60 border border-line hover:border-orchid">${avatarOf(m,32,colorHex(m.color))}<div class="text-left min-w-0"><div class="text-[13px] text-chalk truncate">${esc(m.username)}</div><div class="text-[10px] font-bold" style="color:${color}">${glyph} ${label}</div></div></button>`).join(''):'';
   const inner=[ F(DB.members.filter(m=>activePerk(m,'r20')),'HOUSE LEGEND','#FFC83D','👑'), F(DB.members.filter(m=>activePerk(m,'r16')),'HQ TAKEOVER','#38BDF8','🎙️'), F(DB.members.filter(m=>activePerk(m,'r7')),'CREATOR SPOTLIGHT','#FF3D9A','🌟') ].filter(Boolean).join('');
   if(!inner) return '';
@@ -2325,13 +2330,16 @@ function viewFeed(){
   const top=[...DB.members].sort((a,b)=>b.xp-a.xp);
   const highlights=top.slice(0,4).map(m=>`<button onclick="openProfile('${m.id}')" class="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-raised text-left">${avatarOf(m,30,colorHex(m.color))}<div class="min-w-0 flex-1"><div class="text-[13px] text-chalk truncate">${esc(m.username)}</div><div class="text-[10px] text-steel">${m.color?esc(m.color)+' Ranger':''}</div></div><span class="font-mono text-[11px]" style="color:${colorHex(m.color)}">${fmt(m.xp)}</span></button>`).join('');
   const star=top[0];
+  const chaser=top[1]; const gap=(star&&chaser)?Math.max(0,star.xp-chaser.xp):0;
+  const dToSun=(()=>{ const n=new Date(); const d=(7-n.getDay())%7; return d===0?7:d; })();
+  const hcount=(star&&DB.reactions&&DB.reactions['hype:'+star.id])?(DB.reactions['hype:'+star.id].count||0):0;
   const _sc=colorHex(star&&star.color);
   const ttHandle=star?String((star.socials&&star.socials.tiktok)||star.tiktok||'').replace(/^@+/,'').trim():'';
   const spotlight = star?`<div class="relative overflow-hidden">
       <div class="absolute inset-x-0 -top-12 h-28 blur-2xl pointer-events-none" style="background:radial-gradient(circle at 50% 0, ${_sc}66, transparent 70%)"></div>
       <div class="relative text-center">
         <div class="grid place-items-center mb-3">${avatarOf(star,80,_sc)}</div>
-        <div class="flex items-center justify-center gap-2 flex-wrap"><div class="font-display text-xl">${esc(star.username)}</div>${typeof perkBadge==='function'?perkBadge(star):''}</div>
+        <div class="flex items-center justify-center gap-2 flex-wrap"><div class="font-display text-xl">${esc(star.username)}</div>${featuredChip()}${typeof perkBadge==='function'?perkBadge(star):''}</div>
         <div class="text-[11px] mb-3" style="color:${_sc}">${star.color?esc(star.color)+' Ranger':'Ranger'}${star.role&&star.role!=='Member'?' \u00b7 '+esc(star.role):''}</div>
         <div class="flex items-center justify-center gap-5 py-2.5 mb-3 rounded-xl bg-ink/40 border border-line/60">
           <div><div class="font-display text-lg leading-none" style="color:${_sc}">${fmt(star.xp)}</div><div class="text-[9px] uppercase tracking-wide text-steel mt-0.5">Power</div></div>
@@ -2339,6 +2347,12 @@ function viewFeed(){
           <div><div class="font-display text-lg leading-none text-gold">${star.streak||0}\uD83D\uDD25</div><div class="text-[9px] uppercase tracking-wide text-steel mt-0.5">Streak</div></div>
         </div>
         <p class="text-[12px] text-silver line-clamp-3">${esc(star.bio||'Leading the House.')}</p>
+        <div class="mt-3 pt-3 border-t border-line/50 text-left">
+          <button onclick="hypeStar('${star.id}')" class="w-full inline-flex items-center justify-center gap-2 text-[13px] font-bold px-3 py-2 rounded-lg bg-orchid/15 text-orchid hover:bg-orchid/25 transition mb-2">\uD83D\uDD25 Hype${hcount?` \u00b7 ${hcount}`:''}</button>
+          ${chaser?`<div class="text-[11px] text-steel">Up next: <span class="text-chalk font-semibold">${esc(chaser.username)}</span> \u2014 ${fmt(gap)} Power behind</div>`:''}
+          <div class="text-[11px] text-steel mt-0.5">\u23F3 Spotlight refreshes in ${dToSun} day${dToSun>1?'s':''}</div>
+          <div class="text-[10px] text-gold/70 mt-1">Hold the spot: <span class="text-gold">+40 Power \u0026 +25 Energy</span> daily.</div>
+        </div>
         <button onclick="openProfile('${star.id}')" class="mt-3 w-full text-[12px] px-3 py-2 rounded-lg font-bold text-ink hover:brightness-110 transition" style="background:linear-gradient(180deg, ${_sc}, ${_sc}cc);box-shadow:0 8px 20px -10px ${_sc}">View profile</button>
         ${ttHandle?`<a href="https://www.tiktok.com/@${ttHandle}" target="_blank" rel="noopener" class="mt-2 w-full inline-flex items-center justify-center gap-2 text-[12px] px-3 py-2 rounded-lg bg-ink/60 border border-line text-chalk hover:border-orchid transition"><svg viewBox="0 0 24 24" class="w-4 h-4" fill="currentColor"><path d="M16.5 3c.3 2.1 1.6 3.8 3.7 4.1v2.5c-1.2 0-2.4-.4-3.6-1.1v6c0 3-2.4 5.5-5.5 5.5A5.5 5.5 0 0 1 5.6 9.9c.3 0 .7 0 1 .1v2.6a2.9 2.9 0 1 0 2 2.8V3h1.9z"/></svg>@${ttHandle} on TikTok</a>${(star._ttvideo&&ttVideoEmbed(star._ttvideo))?`<div class="mt-4"><div class="text-[10px] uppercase tracking-[.15em] text-steel mb-2 text-left">Latest on TikTok</div>${ttVideoEmbed(star._ttvideo)}</div>`:''}<div class="text-[10px] text-steel mt-2 text-left">Tap a video to watch \u2014 hit <span class="text-chalk font-semibold">Follow</span> on TikTok if you don\u2019t already.</div>`:''}
       </div>
@@ -2394,7 +2408,7 @@ function viewProfile(){
       <div class="relative p-5 sm:p-6 flex items-start gap-4 flex-wrap">
         ${avatarOf(m,84,hex)}
         <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-2 flex-wrap"><h1 class="font-display text-3xl" style="${(()=>{const p=topPerk(m);return p?('color:'+p.color):'';})()}">${esc(m.username)}</h1>${perkBadge(m)}${storeFlair(m)}${m.color?rangerChip(m):''}${callsignTag(m)}</div>
+          <div class="flex items-center gap-2 flex-wrap"><h1 class="font-display text-3xl" style="${(()=>{const p=topPerk(m);return p?('color:'+p.color):'';})()}">${esc(m.username)}</h1>${isFeatured(m)?featuredChip():''}${perkBadge(m)}${storeFlair(m)}${m.color?rangerChip(m):''}${callsignTag(m)}</div>
           <div class="text-[12px] text-steel mt-1">${m.role} · <span style="color:${tier.c}">${tier.name}</span> · Level ${lp.level} · Joined ${new Date(m.joined_at).toLocaleDateString('en-US',{month:'short',year:'numeric'})}</div>
           <p class="text-[13px] text-silver mt-2 max-w-xl">${esc(m.bio||'')}</p>
         </div>
@@ -3040,6 +3054,7 @@ function onboardChecklist(u){
 }
 function render(){
   try{ const _cu=me&&me(); if(_cu && typeof checkBadges==='function' && checkBadges(_cu) && typeof save==='function') save(); }catch(e){}
+  try{ const _sc=me&&me(); if(_sc && typeof spotlightBonus==='function') spotlightBonus(_sc); }catch(e){}
   if(!DB.currentUserId || !me()){ viewLogin(); }
   else { (VIEWS[ROUTE]||viewDashboard)(); }
   try{ const u=me(); document.body.classList.toggle('no-anim', !!(u&&u.prefs&&u.prefs.animations===false)); }catch(e){}

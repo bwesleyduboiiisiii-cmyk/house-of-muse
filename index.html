@@ -258,7 +258,7 @@ function rowToMember(r){ const p=r.prefs||{};
     prefs:{ animations:p.animations!==false, nudges:p.nudges!==false, publicProfile:p.publicProfile!==false, sounds:!!p.sounds },
     rsvps:r.rsvps||[], done:r.done||[], inbox:r.inbox||[],
     joined_at: r.joined_at?new Date(r.joined_at).getTime():Date.now(),
-    feed:p._feed||[], xpLog:[], purchases:p._purchases||[], tag:p._tag||'', perks:p._perks||{}, boostNext:!!p._boostNext, questDone:p._questDone||{}, roomLog:[], freezes:1, pending:p._pending||[], onboarded:true,
+    feed:p._feed||[], xpLog:[], purchases:p._purchases||[], tag:p._tag||'', _ttvideo:p._ttvideo||'', perks:p._perks||{}, boostNext:!!p._boostNext, questDone:p._questDone||{}, roomLog:[], freezes:1, pending:p._pending||[], onboarded:true,
     _lore:!!p._lore, _hideChecklist:!!p._hideChecklist };
 }
 function memberToRow(u){ const pr=u.prefs||{};
@@ -268,7 +268,7 @@ function memberToRow(u){ const pr=u.prefs||{};
     avatar_url:u.avatarImg||null, banner_url:u.bannerImg||null,
     badges:u.badges||[], socials:u.socials||{},
     prefs:{ animations:pr.animations!==false, nudges:pr.nudges!==false, publicProfile:pr.publicProfile!==false, sounds:!!pr.sounds,
-            _last_checkin:u.last_checkin||null, _purchases:u.purchases||[], _tag:u.tag||'', _perks:u.perks||{}, _boostNext:!!u.boostNext, _feed:(u.feed||[]).slice(0,40), _questDone:u.questDone||{}, _pending:u.pending||[], _lore:!!u._lore, _hideChecklist:!!u._hideChecklist },
+            _last_checkin:u.last_checkin||null, _purchases:u.purchases||[], _tag:u.tag||'', _ttvideo:u._ttvideo||'', _perks:u.perks||{}, _boostNext:!!u.boostNext, _feed:(u.feed||[]).slice(0,40), _questDone:u.questDone||{}, _pending:u.pending||[], _lore:!!u._lore, _hideChecklist:!!u._hideChecklist },
     rsvps:u.rsvps||[], done:u.done||[], inbox:u.inbox||[] };
 }
 function upsertProfile(u){ if(!u||!sb) return; sb.from('profiles').update(memberToRow(u)).eq('id',u.id).then(r=>{ if(r.error) console.warn('save', r.error.message); }); }
@@ -1816,6 +1816,7 @@ function viewSettings(){
           <div class="space-y-3">
             <div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Callsign</label><input id="s_user" value="${esc(u.username)}" class="${IN}"/></div>
             <div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">TikTok handle</label><input id="s_tt" value="${esc(u.tiktok)}" class="${IN}"/></div>
+            <div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Latest TikTok video link <span class="text-steel/60 lowercase tracking-normal">— shown in Creator Spotlight</span></label><input id="s_ttvid" value="${esc(u._ttvideo||'')}" placeholder="https://www.tiktok.com/@you/video/123…" class="${IN}"/></div>
             <div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Discord</label><input id="s_dc" value="${esc(u.discord)}" class="${IN}"/></div>
             <div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">What do you make?</label><textarea id="s_bio" rows="2" class="${IN} resize-none">${esc(u.bio)}</textarea></div>
           </div>
@@ -2046,6 +2047,7 @@ function saveProfile(){
   u.tiktok=(document.getElementById('s_tt').value||'').trim();
   u.discord=(document.getElementById('s_dc').value||'').trim();
   u.bio=(document.getElementById('s_bio').value||'').trim();
+  { const vv=document.getElementById('s_ttvid'); u._ttvideo=vv?vv.value.trim():(u._ttvideo||''); }
   const gv=id=>{const el=document.getElementById(id);return el?el.value.trim():'';};
   u.socials={ tiktok:u.tiktok, instagram:gv('s_ig'), youtube:gv('s_yt'), x:gv('s_x'), twitch:gv('s_tw'), discord:u.discord, website:gv('s_web') };
   if(Object.values(u.socials).filter(v=>v&&String(v).trim()).length>=3) earnBadge(u,'social_pro');
@@ -2314,7 +2316,7 @@ function viewFeed(){
         </div>
         <p class="text-[12px] text-silver line-clamp-3">${esc(star.bio||'Leading the House.')}</p>
         <button onclick="openProfile('${star.id}')" class="mt-3 w-full text-[12px] px-3 py-2 rounded-lg font-bold text-ink hover:brightness-110 transition" style="background:linear-gradient(180deg, ${_sc}, ${_sc}cc);box-shadow:0 8px 20px -10px ${_sc}">View profile</button>
-        ${ttHandle?`<a href="https://www.tiktok.com/@${ttHandle}" target="_blank" rel="noopener" class="mt-2 w-full inline-flex items-center justify-center gap-2 text-[12px] px-3 py-2 rounded-lg bg-ink/60 border border-line text-chalk hover:border-orchid transition"><svg viewBox="0 0 24 24" class="w-4 h-4" fill="currentColor"><path d="M16.5 3c.3 2.1 1.6 3.8 3.7 4.1v2.5c-1.2 0-2.4-.4-3.6-1.1v6c0 3-2.4 5.5-5.5 5.5A5.5 5.5 0 0 1 5.6 9.9c.3 0 .7 0 1 .1v2.6a2.9 2.9 0 1 0 2 2.8V3h1.9z"/></svg>@${ttHandle} on TikTok</a><div class="mt-4"><div class="text-[10px] uppercase tracking-[.15em] text-steel mb-2 text-left">Latest on TikTok</div><blockquote class="tiktok-embed" cite="https://www.tiktok.com/@${ttHandle}" data-unique-id="${ttHandle}" data-embed-type="creator" style="max-width:100%;min-width:288px;margin:0 auto"><section><a target="_blank" href="https://www.tiktok.com/@${ttHandle}">@${ttHandle}</a></section></blockquote></div><div class="text-[10px] text-steel mt-2 text-left">Tap a video to watch \u2014 hit <span class="text-chalk font-semibold">Follow</span> on TikTok if you don\u2019t already.</div>`:''}
+        ${ttHandle?`<a href="https://www.tiktok.com/@${ttHandle}" target="_blank" rel="noopener" class="mt-2 w-full inline-flex items-center justify-center gap-2 text-[12px] px-3 py-2 rounded-lg bg-ink/60 border border-line text-chalk hover:border-orchid transition"><svg viewBox="0 0 24 24" class="w-4 h-4" fill="currentColor"><path d="M16.5 3c.3 2.1 1.6 3.8 3.7 4.1v2.5c-1.2 0-2.4-.4-3.6-1.1v6c0 3-2.4 5.5-5.5 5.5A5.5 5.5 0 0 1 5.6 9.9c.3 0 .7 0 1 .1v2.6a2.9 2.9 0 1 0 2 2.8V3h1.9z"/></svg>@${ttHandle} on TikTok</a>${(star._ttvideo&&ttVideoEmbed(star._ttvideo))?`<div class="mt-4"><div class="text-[10px] uppercase tracking-[.15em] text-steel mb-2 text-left">Latest on TikTok</div>${ttVideoEmbed(star._ttvideo)}</div>`:''}<div class="text-[10px] text-steel mt-2 text-left">Tap a video to watch \u2014 hit <span class="text-chalk font-semibold">Follow</span> on TikTok if you don\u2019t already.</div>`:''}
       </div>
     </div>`:'';
   app.innerHTML = shell(`
@@ -2327,9 +2329,10 @@ function viewFeed(){
       </div>
     </div>
   `);
-  if(ttHandle) loadTikTok();
+  if(star && star._ttvideo && ttVideoEmbed(star._ttvideo)) loadTikTok();
 }
 var lbScope='all';
+function ttVideoEmbed(url){ if(!url) return ''; const m=String(url).match(/video\/(\d+)/); if(!m) return ''; return `<blockquote class="tiktok-embed" cite="${esc(url)}" data-video-id="${m[1]}" style="max-width:100%;min-width:288px;margin:0 auto"><section></section></blockquote>`; }
 function loadTikTok(){ try{ const old=document.getElementById('ttembed'); if(old) old.remove(); const sc=document.createElement('script'); sc.id='ttembed'; sc.async=true; sc.src='https://www.tiktok.com/embed.js'; document.body.appendChild(sc); }catch(e){} }
 function growthFeed(m){
   const items=(m.feed||[]).slice(0,18);

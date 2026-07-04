@@ -2717,8 +2717,8 @@ async function loadContent(){ if(!sb) return;
       sb.from('rooms').select('*'),
       sb.from('reactions').select('*')
     ]);
-    if(ev.data&&ev.data.length) DB.events=ev.data.map(e=>({id:e.id,title:e.title,category:e.category,platform:e.platform,starts_at:e.starts_at?new Date(e.starts_at).getTime():Date.now(),reward:e.reward,desc:e.descr||''}));
-    if(ch.data&&ch.data.length) DB.challenges=ch.data.map(c=>({id:c.id,title:c.title,desc:c.descr||'',xp:c.xp,coins:c.coins,badge:c.badge||''}));
+    DB.events=(ev.data||[]).map(e=>({id:e.id,title:e.title,category:e.category,platform:e.platform,starts_at:e.starts_at?new Date(e.starts_at).getTime():Date.now(),reward:e.reward,desc:e.descr||''}));
+    DB.challenges=(ch.data||[]).map(c=>({id:c.id,title:c.title,desc:c.descr||'',xp:c.xp,coins:c.coins,badge:c.badge||''}));
     DB.battles=(ba.data||[]).map(b=>({id:b.id,fighterId:b.fighter_id,opponent:b.opponent,community:b.community,result:b.result,score:b.score,platform:b.platform,date:b.battle_date?new Date(b.battle_date).getTime():Date.now(),link:b.link,note:b.note,oppImg:b.opp_img})); DB._battlesSeed=true;
     DB.posts=(po.data||[]).map(p=>({id:p.id,authorId:p.author_id,text:p.body||'',img:p.img_url||null,poll:p.poll||null,t:p.created_at?new Date(p.created_at).getTime():Date.now()}));
     if(ro.data&&ro.data.length) DB.rooms=ro.data.map(r=>({id:r.id,name:r.name,topic:r.topic,accent:r.accent||'#E12B38',regulars:[]}));
@@ -2812,8 +2812,8 @@ async function saveChallengeForm(){ const g=id=>{const e=document.getElementById
   if(res.error){ toast('Save failed: '+res.error.message,'bad'); return; }
   editing=null; await loadContent(); render(); toast('Drill saved','gold');
 }
-async function deleteEvent(id){ if(!confirm('Delete this mission?')) return; const { error } = await sb.from('events').delete().eq('id',id); if(error){ toast(error.message,'bad'); return; } editing=null; await loadContent(); render(); toast('Mission deleted'); }
-async function deleteChallenge(id){ if(!confirm('Delete this drill?')) return; const { error } = await sb.from('challenges').delete().eq('id',id); if(error){ toast(error.message,'bad'); return; } editing=null; await loadContent(); render(); toast('Drill deleted'); }
+async function deleteEvent(id){ if(!confirm('Delete this mission?')) return; if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)){ DB.events=(DB.events||[]).filter(e=>e.id!==id); editing=null; render(); toast('Removed'); return; } const { error } = await sb.from('events').delete().eq('id',id); if(error){ toast(error.message,'bad'); return; } editing=null; await loadContent(); render(); toast('Mission deleted','gold'); }
+async function deleteChallenge(id){ if(!confirm('Delete this drill?')) return; if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)){ DB.challenges=(DB.challenges||[]).filter(c=>c.id!==id); editing=null; render(); toast('Removed'); return; } const { error } = await sb.from('challenges').delete().eq('id',id); if(error){ toast(error.message,'bad'); return; } editing=null; await loadContent(); render(); toast('Drill deleted','gold'); }
 async function createRoom(){ const name=(prompt('Name your room')||'').trim(); if(!name) return; const topic=(prompt('One-line topic (optional)')||'').trim(); const accents=['#E12B38','#2563EB','#FFC83D','#16A34A','#FF3D9A']; const { error } = await sb.from('rooms').insert({name, topic:topic||'A new room in the House.', accent:accents[(DB.rooms||[]).length%accents.length]}); if(error){ toast('Failed: '+error.message,'bad'); return; } await loadContent(); render(); toast('Channel created','gold'); }
 function uploadPic(input, kind){
   const file=input&&input.files&&input.files[0]; if(!file) return;

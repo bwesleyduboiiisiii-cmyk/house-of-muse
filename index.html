@@ -1495,12 +1495,23 @@ async function addScheduled(){ const g=id=>{const e=document.getElementById(id);
 async function importSchedule(){ const ta=document.getElementById('sch_bulk'); const raw=(ta&&ta.value||'').trim(); if(!raw){ toast('Paste your schedule first','bad'); return; }
   const fsel=document.getElementById('sch_fighter'); const fid=(fsel&&fsel.value)||me().id;
   const now=new Date(); const rows=[];
-  raw.split(/\n+/).forEach(line=>{ line=line.trim(); if(!line || !/\d{1,2}\/\d{1,2}/.test(line)) return;
-    const p=line.split('|').map(x=>x.trim()); if(p.length<3) return;
-    const dm=p[0].match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/); if(!dm) return; const mo=+dm[1], da=+dm[2]; let yr=dm[3]?(+dm[3]<100?2000+ +dm[3]:+dm[3]):now.getFullYear();
-    const tm=p[1].match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i); if(!tm) return; let hh=+tm[1]; const mm=+tm[2]; const ap=(tm[3]||'').toUpperCase(); if(ap==='PM'&&hh<12)hh+=12; if(ap==='AM'&&hh===12)hh=0;
+  raw.split(/\n+/).forEach(line=>{ line=line.replace(/\r/g,'').trim(); if(!line || !/\d{1,2}\/\d{1,2}/.test(line)) return;
+    let date,timeStr,opp,dia,pow,adult,agency;
+    if(line.includes('|')){ const p=line.split('|').map(x=>x.trim()); date=p[0]; timeStr=p[1]; opp=p[2]; agency=p[3]; dia=p[4]; pow=p[5]; adult=p[6]; }
+    else {
+      const cells=line.split('\t').map(x=>x.trim());
+      date=cells.find(c=>/\d{1,2}\/\d{1,2}/.test(c))||cells[0];
+      const times=cells.filter(c=>/\d{1,2}:\d{2}\s*(AM|PM)?/i.test(c));
+      timeStr=times[0]||'8:00 PM';
+      const lti = times.length ? cells.lastIndexOf(times[times.length-1]) : 0;
+      const rest=cells.slice(lti+1).map(x=>x.trim()).filter(x=>x && x!=='\u2014' && x!=='-');
+      opp=rest[0]; dia=rest[1]; pow=rest[2]; adult=rest[3]; agency=(rest.length>1)?rest[rest.length-1]:'';
+    }
+    const dm=String(date).match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/); if(!dm) return; const mo=+dm[1], da=+dm[2]; let yr=dm[3]?(+dm[3]<100?2000+ +dm[3]:+dm[3]):now.getFullYear();
+    const tm=String(timeStr).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i); let hh=20,mm=0; if(tm){ hh=+tm[1]; mm=+tm[2]; const ap=(tm[3]||'').toUpperCase(); if(ap==='PM'&&hh<12)hh+=12; if(ap==='AM'&&hh===12)hh=0; }
     const when=new Date(yr,mo-1,da,hh,mm); if(isNaN(when.getTime())) return;
-    const nt=[p[4]?('Diamonds: '+p[4]):'', p[5]?('Power-Ups: '+p[5]):'', p[6]?('18+: '+p[6]):''].filter(Boolean).join(' \u00b7 '); rows.push({ fighter_id:fid, opponent:p[2]||'Unknown', community:p[3]||'', result:'Scheduled', score:'', platform:'TikTok', battle_date:when.toISOString(), link:'', note:nt, opp_img:null });
+    const nt=[dia?('Diamonds: '+dia):'', pow?('Power-Ups: '+pow):'', adult?('18+: '+adult):''].filter(Boolean).join(' \u00b7 ');
+    rows.push({ fighter_id:fid, opponent:opp||'Unknown', community:agency||'', result:'Scheduled', score:'', platform:'TikTok', battle_date:when.toISOString(), link:'', note:nt, opp_img:null });
   });
   if(!rows.length){ toast('Couldn\u2019t read any battles \u2014 check the format','bad'); return; }
   const btn=document.getElementById('sch_import'); if(btn){ btn.disabled=true; btn.textContent='Importing\u2026'; }
@@ -1534,7 +1545,7 @@ function scheduleOverlay(){ if(!scheduleOpen) return '';
       <button id="sch_add" onclick="addScheduled()" class="w-full py-3 rounded-xl font-bold text-ink bg-gradient-to-b from-[#ff5a4d] to-orchid hover:brightness-110 mb-4">Add to schedule</button>
       <div class="border-t border-line pt-4 mb-4">
         <div class="text-[11px] uppercase tracking-wide text-steel mb-1">Or paste a whole week</div>
-        <p class="text-[11px] text-steel mb-2">One battle per line: <span class="text-silver">MM/DD | 8:30 PM | opponent | agency | diamonds | power-ups | 18+</span></p>
+        <p class="text-[11px] text-steel mb-2">Paste rows straight from your schedule sheet (with tabs), or one per line: <span class="text-silver">MM/DD | 8:30 PM | opponent | agency | diamonds | power-ups | 18+</span></p>
         <textarea id="sch_bulk" rows="6" placeholder="07/01 | 8:30 PM | swolemigoking | rare | 20-30K | Yes | No" class="${IN2} resize-none font-mono text-[12px]"></textarea>
         <button id="sch_import" onclick="importSchedule()" class="w-full mt-2 py-2.5 rounded-xl font-semibold text-chalk bg-raised border border-line hover:border-orchid">Import all</button>
       </div>

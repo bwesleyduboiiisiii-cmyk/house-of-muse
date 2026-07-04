@@ -2297,16 +2297,31 @@ function viewFeed(){
       </div>
     </div>`).join('') : `<div class="text-sm text-steel py-10 text-center">No activity yet — morph in to start the buzz.</div>`;
   const top=[...DB.members].sort((a,b)=>b.xp-a.xp);
-  const highlights=top.slice(0,4).map(m=>`<button onclick="openProfile('${m.id}')" class="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-raised text-left">${avatar(m.username,30,colorHex(m.color))}<div class="min-w-0 flex-1"><div class="text-[13px] text-chalk truncate">${esc(m.username)}</div><div class="text-[10px] text-steel">${m.color?esc(m.color)+' Ranger':''}</div></div><span class="font-mono text-[11px]" style="color:${colorHex(m.color)}">${fmt(m.xp)}</span></button>`).join('');
+  const highlights=top.slice(0,4).map(m=>`<button onclick="openProfile('${m.id}')" class="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-raised text-left">${avatarOf(m,30,colorHex(m.color))}<div class="min-w-0 flex-1"><div class="text-[13px] text-chalk truncate">${esc(m.username)}</div><div class="text-[10px] text-steel">${m.color?esc(m.color)+' Ranger':''}</div></div><span class="font-mono text-[11px]" style="color:${colorHex(m.color)}">${fmt(m.xp)}</span></button>`).join('');
   const star=top[0];
-  const spotlight = star?`<div class="text-center"><div class="grid place-items-center mb-2">${avatar(star.username,64,colorHex(star.color))}</div><div class="font-display text-lg">${esc(star.username)}</div><div class="text-[11px]" style="color:${colorHex(star.color)}">${star.color?esc(star.color)+' Ranger':'Ranger'}</div><p class="text-[12px] text-silver mt-2 line-clamp-3">${esc(star.bio||'Leading the House.')}</p><button onclick="openProfile('${star.id}')" class="mt-3 text-[12px] px-3 py-1.5 rounded-lg bg-orchid/20 text-orchid hover:bg-orchid/30">View profile</button></div>`:'';
+  const _sc=colorHex(star&&star.color);
+  const spotlight = star?`<div class="relative overflow-hidden">
+      <div class="absolute inset-x-0 -top-12 h-28 blur-2xl pointer-events-none" style="background:radial-gradient(circle at 50% 0, ${_sc}66, transparent 70%)"></div>
+      <div class="relative text-center">
+        <div class="grid place-items-center mb-3">${avatarOf(star,80,_sc)}</div>
+        <div class="flex items-center justify-center gap-2 flex-wrap"><div class="font-display text-xl">${esc(star.username)}</div>${typeof perkBadge==='function'?perkBadge(star):''}</div>
+        <div class="text-[11px] mb-3" style="color:${_sc}">${star.color?esc(star.color)+' Ranger':'Ranger'}${star.role&&star.role!=='Member'?' \u00b7 '+esc(star.role):''}</div>
+        <div class="flex items-center justify-center gap-5 py-2.5 mb-3 rounded-xl bg-ink/40 border border-line/60">
+          <div><div class="font-display text-lg leading-none" style="color:${_sc}">${fmt(star.xp)}</div><div class="text-[9px] uppercase tracking-wide text-steel mt-0.5">Power</div></div>
+          <div><div class="font-display text-lg leading-none text-chalk">${levelFromXP(star.xp)}</div><div class="text-[9px] uppercase tracking-wide text-steel mt-0.5">Level</div></div>
+          <div><div class="font-display text-lg leading-none text-gold">${star.streak||0}\uD83D\uDD25</div><div class="text-[9px] uppercase tracking-wide text-steel mt-0.5">Streak</div></div>
+        </div>
+        <p class="text-[12px] text-silver line-clamp-3">${esc(star.bio||'Leading the House.')}</p>
+        <button onclick="openProfile('${star.id}')" class="mt-3 w-full text-[12px] px-3 py-2 rounded-lg font-bold text-ink hover:brightness-110 transition" style="background:linear-gradient(180deg, ${_sc}, ${_sc}cc);box-shadow:0 8px 20px -10px ${_sc}">View profile</button>
+      </div>
+    </div>`:'';
   app.innerHTML = shell(`
     ${banner('What the squad’s up to','The Buzz','Everyone’s recent growth in one stream. Cheer your squad on with 👑💎✨.')}
     <div class="grid lg:grid-cols-3 gap-4">
       <div class="lg:col-span-2 space-y-2.5">${feedComposer()}${postsHTML}${postsHTML&&all.length?'<div class="text-[11px] uppercase tracking-[.18em] text-steel pt-2 pb-1">Squad activity</div>':''}${rows}</div>
       <div class="space-y-4">
         <section class="bg-panel border border-line rounded-2xl p-4"><h3 class="font-display text-lg mb-2">Squad Highlights</h3><div class="-mx-1">${highlights}</div></section>
-        <section class="bg-gradient-to-br from-royal/25 to-panel border border-line rounded-2xl p-5"><div class="text-[10px] uppercase tracking-[.2em] text-gold/80 mb-2 text-center">Creator Spotlight</div>${spotlight}</section>
+        <section class="relative overflow-hidden border rounded-2xl p-5" style="border-color:rgba(255,200,61,.28);background:linear-gradient(162deg, rgba(255,200,61,.12), #14121C 72%)"><div class="text-[10px] uppercase tracking-[.2em] text-gold/80 mb-3 text-center">🌟 Creator Spotlight</div>${spotlight}</section>
       </div>
     </div>
   `);

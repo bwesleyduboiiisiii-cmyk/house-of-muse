@@ -1382,7 +1382,7 @@ function saveEventForm(){
 }
 function deleteEvent(id){ if(!confirm('Delete this mission? RSVPs to it will be cleared.')) return; DB.events=DB.events.filter(e=>e.id!==id); DB.members.forEach(m=>{ m.rsvps=(m.rsvps||[]).filter(r=>r!==id); }); editing=null; save(); render(); toast('Mission deleted'); }
 function newChallenge(){ editing={kind:'challenge', id:null, title:'', desc:'', xp:80, coins:25, badge:''}; render(); }
-function editChallenge(id){ const c=DB.challenges.find(x=>x.id===id); if(!c) return; editing={kind:'challenge', id:c.id, title:c.title, desc:c.desc, xp:c.xp, coins:c.coins, badge:c.badge||''}; render(); }
+function editChallenge(id){ const c=DB.challenges.find(x=>x.id===id)||(typeof MISSION_POOL!=='undefined'?MISSION_POOL.concat(DRILL_POOL).find(x=>x.id===id):null); if(!c) return; editing={kind:'challenge', id:c.id, title:c.title, desc:c.desc, xp:c.xp, coins:c.coins, badge:c.badge||''}; render(); }
 function saveChallengeForm(){
   const g=id=>{const el=document.getElementById(id);return el?el.value:'';};
   const title=g('cd_title').trim(); if(!title){ toast('Give the drill a title','bad'); return; }
@@ -1613,7 +1613,7 @@ function viewEvents(){
       </div>
     </div>`:''}
     <div class="flex items-center justify-between gap-3 mb-4 flex-wrap"><div class="flex gap-2 flex-wrap">${cats.map(fbtn).join('')}</div>${newBtn}</div>
-    ${cards?`<div class="grid sm:grid-cols-2 gap-3">${cards}</div>`:`<div class="text-sm text-steel py-10 text-center">No missions yet.${isOwner?' Tap \u201C+ New mission\u201D to add one.':''}</div>`}
+    <div class="text-[11px] uppercase tracking-wide text-steel mb-2">Active missions \u00b7 rotates automatically</div><div class="grid sm:grid-cols-2 gap-3">${poolMissionCards()}${cards}</div>
     ${editorOverlay()}
     ${footerLine()}
   `);
@@ -1655,7 +1655,7 @@ function viewChallenges(){
       <div class="h-2.5 rounded-full bar-bg overflow-hidden"><div class="h-full rounded-full bg-gradient-to-r from-orchid to-gold transition-all" style="width:${pct}%"></div></div>
     </div>
     ${isStaff?`<div class="flex justify-end mb-4"><button onclick="newChallenge()" class="text-xs px-3 py-1.5 rounded-lg bg-gold/20 text-gold hover:bg-gold/30 font-semibold">+ New drill</button></div>`:''}
-    ${cards?`<div class="grid sm:grid-cols-2 gap-3">${cards}</div>`:`<div class="text-sm text-steel py-10 text-center">No drills yet.${isOwner?' Tap \u201C+ New drill\u201D to add one.':''}</div>`}
+    <div class="text-[11px] uppercase tracking-wide text-steel mb-2">Today\u2019s drills \u00b7 3 fresh daily</div><div class="grid sm:grid-cols-2 gap-3">${poolDrillCards()}${cards}</div>
     ${editorOverlay()}
     ${footerLine()}
   `);
@@ -1930,7 +1930,7 @@ function viewAdmin(){
   const reviewBody = subs.length ? subs.map(({m,p})=>{
     return `<div class="flex items-start gap-3 p-4 bg-panel border border-line rounded-2xl">
       <button onclick="openProfile('${m.id}')" aria-label="${esc(m.username)}" class="shrink-0 mt-0.5">${avatar(m.username,32,colorHex(m.color))}</button>
-      <div class="min-w-0 flex-1"><div class="text-[13px] text-chalk">${esc(m.username)} <span class="text-steel">submitted</span> <span class="text-silver">${esc(p.title||p.ref||'a task')}</span> <span class="text-[10px] px-1.5 py-0.5 rounded ${p.kind==='quest'?'bg-orchid/15 text-orchid':'bg-gold/15 text-gold'}">${p.kind==='quest'?'Quest':'Drill'}</span></div>
+      <div class="min-w-0 flex-1"><div class="text-[13px] text-chalk">${esc(m.username)} <span class="text-steel">submitted</span> <span class="text-silver">${esc(p.title||p.ref||'a task')}</span> <span class="text-[10px] px-1.5 py-0.5 rounded ${p.kind==='quest'&&p.qscope!=='drill'?'bg-orchid/15 text-orchid':'bg-gold/15 text-gold'}">${p.kind==='quest'&&p.qscope!=='drill'?'Quest':'Drill'}</span></div>
       <div class="text-[11px] text-steel">${timeAgo(p.t)} \u00b7 +${p.xp||0} Power${p.coins?', +'+p.coins+' Energy':''}</div>
       ${p.note?`<div class="text-[12px] text-silver mt-1.5 p-2 rounded-lg bg-raised border border-line">\u201C${esc(p.note)}\u201D</div>`:`<div class="text-[11px] text-steel/60 mt-1">No proof note attached</div>`}</div>
       ${isStaff?`<div class="flex flex-col gap-2 shrink-0"><button onclick="approveSubmission('${m.id}','${p.pid}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30">Approve</button><button onclick="declineSubmission('${m.id}','${p.pid}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-rose/15 text-rose hover:bg-rose/25">Decline</button></div>`:'<span class="text-[11px] text-steel shrink-0">owner reviews</span>'}
@@ -1983,7 +1983,7 @@ function completeChallenge(id){
   const u=me();
   if(u.done.includes(id)){ toast('Already done','bad'); return; }
   if((u.pending||[]).some(p=>p.kind==='challenge'&&p.ref===id)){ toast('Already submitted \u2014 waiting on review','bad'); return; }
-  const c=DB.challenges.find(x=>x.id===id); if(!c) return;
+  const c=DB.challenges.find(x=>x.id===id)||(typeof MISSION_POOL!=='undefined'?MISSION_POOL.concat(DRILL_POOL).find(x=>x.id===id):null); if(!c) return;
   const note=(prompt('Show your work \u2014 add a link or note as proof for the owner (optional):')||'').trim();
   u.pending=u.pending||[]; u.pending.push({pid:'s_'+Date.now().toString(36)+Math.floor(Math.random()*999), kind:'challenge', ref:id, title:c.title, xp:c.xp, coins:c.coins, badge:c.badge||null, note, t:Date.now()});
   upsertProfile(u); render(); toast('Submitted for review \u2014 the owner will confirm it \u23F3','gold');
@@ -1992,7 +1992,7 @@ function approveSubmission(mid,pid){
   const m=DB.members.find(x=>x.id===mid); if(!m) return;
   const p=(m.pending||[]).find(x=>x.pid===pid); if(!p){ render(); return; }
   m.pending=(m.pending||[]).filter(x=>x.pid!==pid);
-  if(p.kind==='quest'){ m.questDone=m.questDone||{}; m.questDone[p.qscope]=m.questDone[p.qscope]||{}; const key=p.qscope==='daily'?_dayKey():_weekKey(); m.questDone[p.qscope][key]=m.questDone[p.qscope][key]||[]; if(!m.questDone[p.qscope][key].includes(p.ref)) m.questDone[p.qscope][key].push(p.ref); }
+  if(p.kind==='quest'){ m.questDone=m.questDone||{}; m.questDone[p.qscope]=m.questDone[p.qscope]||{}; const key=p.qscope==='weekly'?_weekKey():_dayKey(); m.questDone[p.qscope][key]=m.questDone[p.qscope][key]||[]; if(!m.questDone[p.qscope][key].includes(p.ref)) m.questDone[p.qscope][key].push(p.ref); }
   else { if(!m.done.includes(p.ref)) m.done.push(p.ref); }
   let _xp=p.xp||0, _co=p.coins||0; if(m.boostNext){ _xp*=2; m.boostNext=false; } if(activePerk(m,'r17')) _co*=2;
   awardXP(m,_xp,'Approved: '+p.title); awardCoins(m,_co,'Approved: '+p.title); if(p.badge) earnBadge(m,p.badge);
@@ -2687,33 +2687,234 @@ function celebrate(title, sub){
 }
 /* ===================== QUEST ENGINE ===================== */
 const DAILY_POOL=[
-  {id:'d_morph', title:'Morph in (daily check-in)', xp:15, coins:8, glyph:'⚡'},
-  {id:'d_post', title:'Post something in The Buzz', xp:20, coins:10, glyph:'📣'},
-  {id:'d_react', title:'Hype 3 squadmates', xp:12, coins:6, glyph:'👑'},
-  {id:'d_comms', title:'Drop into a Comms room', xp:18, coins:8, glyph:'🎤'},
-  {id:'d_profile', title:'Update your profile or socials', xp:10, coins:5, glyph:'✨'},
-  {id:'d_invite', title:'Invite a creator to the House', xp:25, coins:12, glyph:'🤝'},
-  {id:'d_clip', title:'Share a clip from your latest post', xp:15, coins:8, glyph:'🎬'},
-  {id:'d_rank', title:'Check the leaderboard & cheer #1', xp:8, coins:4, glyph:'🏆'},
+  {id:"d1", title:"First Five Welcome", desc:"Welcome the first five people in your chat.", xp:20, coins:15, glyph:"\ud83d\ude4c", diff:"Easy"},
+  {id:"d2", title:"Chat Commander", desc:"Fire off 10 hype messages in a battle chat.", xp:24, coins:18, glyph:"\ud83d\udcac", diff:"Easy"},
+  {id:"d3", title:"Triple Share Challenge", desc:"Share three clips today.", xp:28, coins:22, glyph:"\ud83d\udd01", diff:"Easy"},
+  {id:"d4", title:"Team Cheerleader", desc:"Hype three squadmates' posts.", xp:22, coins:20, glyph:"\ud83d\udce3", diff:"Easy"},
+  {id:"d5", title:"Morph In", desc:"Check in and morph in for the day.", xp:26, coins:25, glyph:"\u26a1", diff:"Easy"},
+  {id:"d6", title:"Comms Check", desc:"Drop into a Comms room.", xp:30, coins:16, glyph:"\ud83c\udfa4", diff:"Easy"},
+  {id:"d7", title:"Profile Polish", desc:"Freshen up your bio or profile pic.", xp:20, coins:15, glyph:"\u2728", diff:"Easy"},
+  {id:"d8", title:"Leaderboard Salute", desc:"Cheer on the current #1.", xp:24, coins:18, glyph:"\ud83c\udfc6", diff:"Easy"},
+  {id:"d9", title:"Buzz Drop", desc:"Post once in The Buzz.", xp:28, coins:22, glyph:"\ud83d\udcdd", diff:"Easy"},
+  {id:"d10", title:"Gift Callout", desc:"Thank a gifter live by name.", xp:22, coins:20, glyph:"\ud83c\udf81", diff:"Easy"},
+  {id:"d11", title:"Streak Keeper", desc:"Keep your morph streak alive.", xp:26, coins:25, glyph:"\ud83d\udd25", diff:"Easy"},
+  {id:"d12", title:"Clip It", desc:"Post a clip from your last stream.", xp:30, coins:16, glyph:"\ud83c\udfac", diff:"Easy"},
+  {id:"d13", title:"Follow Back", desc:"Return five follows.", xp:20, coins:15, glyph:"\u2795", diff:"Easy"},
+  {id:"d14", title:"Emoji Storm", desc:"React to five posts.", xp:24, coins:18, glyph:"\ud83d\udca5", diff:"Easy"},
+  {id:"d15", title:"Quick Intro", desc:"Introduce yourself in a new room.", xp:28, coins:22, glyph:"\ud83d\udc4b", diff:"Easy"},
+  {id:"d16", title:"Daily Watch", desc:"Watch a squadmate's LIVE for five minutes.", xp:22, coins:20, glyph:"\ud83d\udc40", diff:"Easy"},
+  {id:"d17", title:"Tag Team", desc:"Tag a friend in a post.", xp:26, coins:25, glyph:"\ud83c\udff7\ufe0f", diff:"Easy"},
+  {id:"d18", title:"Warm Up", desc:"Go live for ten minutes.", xp:30, coins:16, glyph:"\ud83c\udfa5", diff:"Easy"},
+  {id:"d19", title:"Shout Someone Out", desc:"Give a public shoutout.", xp:20, coins:15, glyph:"\ud83d\udce2", diff:"Easy"},
+  {id:"d20", title:"Set Your Status", desc:"Post today's goal in chat.", xp:24, coins:18, glyph:"\ud83c\udfaf", diff:"Easy"},
+  {id:"d21", title:"Perfect Battle Start", desc:"Start a battle on time with a hype intro.", xp:35, coins:25, glyph:"\ud83d\ude80", diff:"Medium"},
+  {id:"d22", title:"50 Viewer Push", desc:"Hit 50 concurrent viewers.", xp:42, coins:30, glyph:"\ud83d\udcc8", diff:"Medium"},
+  {id:"d23", title:"Last-Second Snipe", desc:"Win a battle in the final ten seconds.", xp:48, coins:35, glyph:"\ud83c\udfaf", diff:"Medium"},
+  {id:"d24", title:"Victory Speech", desc:"Give a post-win thank-you live.", xp:38, coins:28, glyph:"\ud83c\udf99\ufe0f", diff:"Medium"},
+  {id:"d25", title:"Creator Spotlight", desc:"Feature another creator on your LIVE.", xp:45, coins:32, glyph:"\ud83c\udf1f", diff:"Medium"},
+  {id:"d26", title:"Combo Master", desc:"Land a five-gift combo.", xp:50, coins:26, glyph:"\ud83d\udcab", diff:"Medium"},
+  {id:"d27", title:"Host Hour", desc:"Host a full one-hour stream.", xp:35, coins:25, glyph:"\u23f1\ufe0f", diff:"Medium"},
+  {id:"d28", title:"Duet Drop", desc:"Post a duet with a squadmate.", xp:42, coins:30, glyph:"\ud83e\udd1d", diff:"Medium"},
+  {id:"d29", title:"Battle Booker", desc:"Schedule a battle for this week.", xp:48, coins:35, glyph:"\ud83d\udcc5", diff:"Medium"},
+  {id:"d30", title:"Recruit Attempt", desc:"Pitch the House to a new creator.", xp:38, coins:28, glyph:"\ud83d\udce8", diff:"Medium"},
+  {id:"d31", title:"Engagement Run", desc:"Reply to 20 comments.", xp:45, coins:32, glyph:"\ud83d\udcac", diff:"Medium"},
+  {id:"d32", title:"Cross Post", desc:"Post the same content to two platforms.", xp:50, coins:26, glyph:"\ud83d\udd00", diff:"Medium"},
+  {id:"d33", title:"Warm Intro", desc:"Bring a guest onto your LIVE.", xp:35, coins:25, glyph:"\ud83c\udfa7", diff:"Medium"},
+  {id:"d34", title:"Sound Check", desc:"Test and improve your stream audio.", xp:42, coins:30, glyph:"\ud83d\udd0a", diff:"Medium"},
+  {id:"d35", title:"Highlight Reel", desc:"Post a highlight from a recent battle.", xp:48, coins:35, glyph:"\ud83c\udf9e\ufe0f", diff:"Medium"},
+  {id:"d36", title:"Chat Marathon", desc:"Keep chat active for a full stream.", xp:38, coins:28, glyph:"\ud83d\udde8\ufe0f", diff:"Medium"},
+  {id:"d37", title:"Support Blitz", desc:"Send support to three LIVE battles.", xp:45, coins:32, glyph:"\ud83d\udedf", diff:"Medium"},
+  {id:"d38", title:"Momentum Builder", desc:"Go live twice today.", xp:50, coins:26, glyph:"\u26a1", diff:"Medium"},
+  {id:"d39", title:"Story Time", desc:"Post an update about your journey.", xp:35, coins:25, glyph:"\ud83d\udcd6", diff:"Medium"},
+  {id:"d40", title:"Feedback Giver", desc:"Leave thoughtful feedback on a post.", xp:42, coins:30, glyph:"\ud83e\udde0", diff:"Medium"},
+  {id:"d41", title:"Battle MVP", desc:"Be the top scorer in a squad battle.", xp:50, coins:35, glyph:"\ud83e\udd47", diff:"Hard"},
+  {id:"d42", title:"100 Viewer Milestone", desc:"Hit 100 concurrent viewers.", xp:58, coins:42, glyph:"\ud83d\udcaf", diff:"Hard"},
+  {id:"d43", title:"Clean Sweep", desc:"Win three battles in one day.", xp:64, coins:50, glyph:"\ud83e\uddf9", diff:"Hard"},
+  {id:"d44", title:"Marathon Streamer", desc:"Stream three-plus hours today.", xp:70, coins:38, glyph:"\ud83c\udfc3", diff:"Hard"},
+  {id:"d45", title:"Recruit Success", desc:"Sign up a brand-new ranger today.", xp:55, coins:45, glyph:"\ud83d\udc51", diff:"Hard"},
+  {id:"d46", title:"Viral Push", desc:"Get a post over 1k views today.", xp:62, coins:48, glyph:"\ud83d\udcca", diff:"Hard"},
+  {id:"d47", title:"Comeback King", desc:"Win a battle after falling behind.", xp:68, coins:40, glyph:"\ud83d\udd04", diff:"Hard"},
+  {id:"d48", title:"Gift Goal", desc:"Hit a big diamond goal live.", xp:52, coins:44, glyph:"\ud83d\udc8e", diff:"Hard"},
+  {id:"d49", title:"Triple Threat", desc:"Post, battle, and recruit in one day.", xp:66, coins:36, glyph:"\ud83c\udfb2", diff:"Hard"},
+  {id:"d50", title:"Headliner", desc:"Headline a House LIVE tonight.", xp:60, coins:50, glyph:"\ud83c\udf86", diff:"Hard"},
 ];
 const WEEKLY_POOL=[
-  {id:'w_streak', title:'Hit a 5-day morph streak', xp:120, coins:60, glyph:'🔥'},
-  {id:'w_collab', title:'Run a collab or duet with a squadmate', xp:150, coins:75, glyph:'🤝'},
-  {id:'w_battle', title:'Log a creator battle', xp:130, coins:65, glyph:'⚔️'},
-  {id:'w_grow', title:'Post 4 times this week', xp:140, coins:70, glyph:'📈'},
-  {id:'w_recruit', title:'Bring a new ranger into the House', xp:160, coins:80, glyph:'👑'},
-  {id:'w_host', title:'Host or join a live Comms session', xp:120, coins:60, glyph:'🎤'},
+  {id:"w1", title:"Stream 5 Days", desc:"Go live on five separate days this week.", xp:100, coins:80, glyph:"\ud83d\udce1"},
+  {id:"w2", title:"Win 20 Battles", desc:"Rack up 20 battle wins.", xp:140, coins:100, glyph:"\u2694\ufe0f"},
+  {id:"w3", title:"Recruit a New Ranger", desc:"Bring a brand-new creator into the House.", xp:160, coins:120, glyph:"\ud83d\udc51"},
+  {id:"w4", title:"Upload 7 Videos", desc:"Post seven videos this week.", xp:180, coins:140, glyph:"\ud83c\udfac"},
+  {id:"w5", title:"Host a Community Battle", desc:"Run an official House battle event.", xp:200, coins:160, glyph:"\ud83c\udfdf\ufe0f"},
+  {id:"w6", title:"Mentor a New Creator", desc:"Guide a newcomer through their first week.", xp:220, coins:180, glyph:"\ud83e\udded"},
+  {id:"w7", title:"Earn 100k Likes", desc:"Stack 100,000 likes across your content.", xp:250, coins:200, glyph:"\u2764\ufe0f"},
+  {id:"w8", title:"Complete Every Daily", desc:"Clear all your daily quests this week.", xp:280, coins:90, glyph:"\u2705"},
+  {id:"w9", title:"Battle 5 Different Rangers", desc:"Face five different squadmates.", xp:300, coins:110, glyph:"\ud83e\udd3c"},
+  {id:"w10", title:"3-Day Win Streak", desc:"Win at least one battle three days running.", xp:120, coins:130, glyph:"\ud83d\udd25"},
+  {id:"w11", title:"7-Day Morph Streak", desc:"Morph in every day this week.", xp:150, coins:150, glyph:"\ud83d\udcc6"},
+  {id:"w12", title:"Grow 500 Followers", desc:"Gain 500 new followers.", xp:170, coins:170, glyph:"\ud83d\udcc8"},
+  {id:"w13", title:"Post Every Day", desc:"Drop content each day this week.", xp:190, coins:190, glyph:"\ud83d\uddd3\ufe0f"},
+  {id:"w14", title:"Run 10 Battles", desc:"Compete in ten battles.", xp:210, coins:85, glyph:"\ud83e\udd4a"},
+  {id:"w15", title:"Co-host 2 LIVEs", desc:"Co-host two live sessions.", xp:240, coins:105, glyph:"\ud83c\udfa7"},
+  {id:"w16", title:"Host a 2v2", desc:"Run a two-versus-two House battle.", xp:260, coins:125, glyph:"\ud83d\udc65"},
+  {id:"w17", title:"Land 5 Collabs", desc:"Collab or duet with five creators.", xp:290, coins:145, glyph:"\ud83e\udd1d"},
+  {id:"w18", title:"Feature 3 Creators", desc:"Spotlight three creators on your LIVE.", xp:110, coins:165, glyph:"\ud83c\udf1f"},
+  {id:"w19", title:"Grow a New Platform", desc:"Start building on a second platform.", xp:130, coins:185, glyph:"\ud83c\udf10"},
+  {id:"w20", title:"Hit a Diamond Goal", desc:"Reach a set diamond target this week.", xp:175, coins:95, glyph:"\ud83d\udc8e"},
+  {id:"w21", title:"Recruit 3 Creators", desc:"Bring three new creators aboard.", xp:100, coins:80, glyph:"\ud83e\uddf2"},
+  {id:"w22", title:"50 Support Visits", desc:"Support 50 LIVE battles.", xp:140, coins:100, glyph:"\ud83d\udedf"},
+  {id:"w23", title:"Reply to 500 Comments", desc:"Engage 500 comments this week.", xp:160, coins:120, glyph:"\ud83d\udcac"},
+  {id:"w24", title:"New Viewer High", desc:"Beat your concurrent-viewer record.", xp:180, coins:140, glyph:"\ud83d\udcca"},
+  {id:"w25", title:"Complete 15 Drills", desc:"Finish 15 training drills.", xp:200, coins:160, glyph:"\ud83c\udfaf"},
+  {id:"w26", title:"Attend 3 Battles", desc:"Show up to three scheduled battles.", xp:220, coins:180, glyph:"\ud83c\udf9f\ufe0f"},
+  {id:"w27", title:"Organize a Squad Event", desc:"Plan and run a squad activity.", xp:250, coins:200, glyph:"\ud83d\udccb"},
+  {id:"w28", title:"Welcome 20 Newcomers", desc:"Greet 20 new faces.", xp:280, coins:90, glyph:"\ud83d\ude4c"},
+  {id:"w29", title:"Land a Viral Clip", desc:"Get a clip over 10k views.", xp:300, coins:110, glyph:"\ud83d\ude80"},
+  {id:"w30", title:"Build a Highlight Reel", desc:"Compile a week of highlights.", xp:120, coins:130, glyph:"\ud83c\udf9e\ufe0f"},
+  {id:"w31", title:"Mentor Session", desc:"Run a coaching session for a ranger.", xp:150, coins:150, glyph:"\ud83e\udde0"},
+  {id:"w32", title:"Cross-Promote a Ranger", desc:"Shout out a squadmate to your audience.", xp:170, coins:170, glyph:"\ud83d\udce3"},
+  {id:"w33", title:"Fill Your Battle Schedule", desc:"Book a full week of battles.", xp:190, coins:190, glyph:"\ud83d\udcc5"},
+  {id:"w34", title:"Level Up", desc:"Climb at least one level this week.", xp:210, coins:85, glyph:"\u2b06\ufe0f"},
+  {id:"w35", title:"Earn 1000 Energy", desc:"Bank 1,000 Energy from activity.", xp:240, coins:105, glyph:"\u26a1"},
+  {id:"w36", title:"Make a Store Redemption", desc:"Cash in a reward from the Store.", xp:260, coins:125, glyph:"\ud83d\udecd\ufe0f"},
+  {id:"w37", title:"Climb 3 Ranks", desc:"Move up three leaderboard spots.", xp:290, coins:145, glyph:"\ud83e\ude9c"},
+  {id:"w38", title:"Win a Marathon Battle", desc:"Take a long-format battle win.", xp:110, coins:165, glyph:"\ud83c\udfc6"},
+  {id:"w39", title:"Host Office Hours", desc:"Open a Q&A for the community.", xp:130, coins:185, glyph:"\ud83c\udfa4"},
+  {id:"w40", title:"Five-Star Week", desc:"Clear all dailies and drills.", xp:175, coins:95, glyph:"\u2b50"},
+  {id:"w41", title:"Bring Back a Ranger", desc:"Re-activate a lapsed member.", xp:100, coins:80, glyph:"\ud83d\udd01"},
+  {id:"w42", title:"Start a New Series", desc:"Launch a recurring content series.", xp:140, coins:100, glyph:"\ud83d\udcfa"},
+  {id:"w43", title:"Hit 10k Views", desc:"Reach 10,000 views on a post.", xp:160, coins:120, glyph:"\ud83d\udcc8"},
+  {id:"w44", title:"Update the Roster", desc:"Refresh your profile & socials fully.", xp:180, coins:140, glyph:"\ud83d\uddbc\ufe0f"},
+  {id:"w45", title:"Battle a Rival Agency", desc:"Take on an outside crew.", xp:200, coins:160, glyph:"\ud83d\udea9"},
+  {id:"w46", title:"Two-Week Streak", desc:"Extend your morph streak to 14 days.", xp:220, coins:180, glyph:"\ud83d\udd25"},
+  {id:"w47", title:"Run a Community Q&A", desc:"Answer the squad's questions live.", xp:250, coins:200, glyph:"\u2753"},
+  {id:"w48", title:"Season Push", desc:"Break into the top three this week.", xp:280, coins:90, glyph:"\ud83c\udfc5"},
+  {id:"w49", title:"Refer a Business Collab", desc:"Line up a brand or biz collab.", xp:300, coins:110, glyph:"\ud83d\udcbc"},
+  {id:"w50", title:"Squad Photo Day", desc:"Rally the crew for a group post.", xp:120, coins:130, glyph:"\ud83d\udcf8"},
 ];
+const MISSION_POOL=[
+  {id:"MP1", title:"Squad Battle Hour", cat:"LIVE", desc:"Get the whole squad live and battling within the same hour.", xp:30, coins:50},
+  {id:"MP2", title:"Battle Marathon", cat:"Battle", desc:"Run back-to-back battles all evening.", xp:45, coins:70},
+  {id:"MP3", title:"Support Blitz", cat:"Community", desc:"Flood five squadmates' LIVEs with support.", xp:55, coins:90},
+  {id:"MP4", title:"Team Victory", cat:"Team", desc:"Win a 2v2 as a squad.", xp:65, coins:110},
+  {id:"MP5", title:"Community Spotlight", cat:"Community", desc:"Feature a rising creator to the whole House.", xp:40, coins:130},
+  {id:"MP6", title:"Share Storm", cat:"Content", desc:"Everyone shares the same clip in one window.", xp:50, coins:150},
+  {id:"MP7", title:"Creator Rescue", cat:"Community", desc:"Rally support for a squadmate having a slow day.", xp:60, coins:60},
+  {id:"MP8", title:"Hype Squad", cat:"Team", desc:"Assemble a hype crew for someone's big battle.", xp:35, coins:80},
+  {id:"MP9", title:"Victory Parade", cat:"Battle", desc:"Celebrate a squad win across all your channels.", xp:70, coins:100},
+  {id:"MP10", title:"Ranger Rally", cat:"Team", desc:"Get five rangers into one Comms room.", xp:48, coins:120},
+  {id:"MP11", title:"First Response", cat:"LIVE", desc:"Be first in three squadmates' chats today.", xp:58, coins:140},
+  {id:"MP12", title:"Diamond Dash", cat:"Battle", desc:"Combine to hit a squad diamond goal.", xp:30, coins:50},
+  {id:"MP13", title:"Welcome Wagon", cat:"Community", desc:"Greet every new member this week.", xp:45, coins:70},
+  {id:"MP14", title:"Content Sprint", cat:"Content", desc:"Squad drops a piece of content in the same hour.", xp:55, coins:90},
+  {id:"MP15", title:"Tag Relay", cat:"Content", desc:"Pass a tag chain through five rangers.", xp:65, coins:110},
+  {id:"MP16", title:"Live Link-Up", cat:"LIVE", desc:"Two rangers go live together.", xp:40, coins:130},
+  {id:"MP17", title:"Battle Buddies", cat:"Battle", desc:"Pair up and each win a battle.", xp:50, coins:150},
+  {id:"MP18", title:"Cheer Chain", cat:"Community", desc:"Start a chain of shoutouts across the squad.", xp:60, coins:60},
+  {id:"MP19", title:"Prime Time Push", cat:"LIVE", desc:"Everyone live during peak hours.", xp:35, coins:80},
+  {id:"MP20", title:"Clip Collab", cat:"Content", desc:"Two rangers make a clip together.", xp:70, coins:100},
+  {id:"MP21", title:"Rally the Rookies", cat:"Team", desc:"Get new members into their first battle.", xp:48, coins:120},
+  {id:"MP22", title:"Support Sweep", cat:"Community", desc:"Visit ten LIVE battles as a squad.", xp:58, coins:140},
+  {id:"MP23", title:"House Takeover", cat:"LIVE", desc:"Fill a time slot with House rangers only.", xp:30, coins:50},
+  {id:"MP24", title:"Comeback Crew", cat:"Battle", desc:"Help a squadmate bounce back from a loss.", xp:45, coins:70},
+  {id:"MP25", title:"Squad Photo", cat:"Team", desc:"Coordinate a group post or roster shot.", xp:55, coins:90},
+  {id:"MP26", title:"Duet Drive", cat:"Content", desc:"Chain of duets across the squad.", xp:65, coins:110},
+  {id:"MP27", title:"Momentum Monday", cat:"LIVE", desc:"Kick the week off with a squad live block.", xp:40, coins:130},
+  {id:"MP28", title:"Hype Handoff", cat:"Team", desc:"Pass hype energy through three lives.", xp:50, coins:150},
+  {id:"MP29", title:"Feedback Friday", cat:"Community", desc:"Everyone gives one ranger real feedback.", xp:60, coins:60},
+  {id:"MP30", title:"Battle Bracket", cat:"Battle", desc:"Run a mini in-house tournament.", xp:35, coins:80},
+  {id:"MP31", title:"Rise Together", cat:"Team", desc:"Every ranger gains ground on the leaderboard.", xp:70, coins:100},
+  {id:"MP32", title:"Sound Off", cat:"LIVE", desc:"Everyone goes live and checks in on cam.", xp:48, coins:120},
+  {id:"MP33", title:"Creator Carousel", cat:"Content", desc:"Rangers rotate features on each other.", xp:58, coins:140},
+  {id:"MP34", title:"Support Streak", cat:"Community", desc:"Support the same ranger three days running.", xp:30, coins:50},
+  {id:"MP35", title:"Win Wave", cat:"Battle", desc:"Squad logs five wins in a day.", xp:45, coins:70},
+  {id:"MP36", title:"Newcomer Nudge", cat:"Community", desc:"Personally invite a lapsed member back.", xp:55, coins:90},
+  {id:"MP37", title:"Team Trailer", cat:"Content", desc:"Cut a hype trailer for the squad.", xp:65, coins:110},
+  {id:"MP38", title:"Live Ladder", cat:"Battle", desc:"Climb the battle ladder as a group.", xp:40, coins:130},
+  {id:"MP39", title:"Roll Call", cat:"Team", desc:"Every active ranger checks in today.", xp:50, coins:150},
+  {id:"MP40", title:"Golden Hour", cat:"LIVE", desc:"Coordinate a synchronized live hour.", xp:60, coins:60},
+  {id:"MP41", title:"Boost Brigade", cat:"Community", desc:"Everyone boosts one post to the top.", xp:35, coins:80},
+  {id:"MP42", title:"Battle Blitz", cat:"Battle", desc:"Ten squad battles in one night.", xp:70, coins:100},
+  {id:"MP43", title:"Story Swap", cat:"Content", desc:"Rangers reshare each other's stories.", xp:48, coins:120},
+  {id:"MP44", title:"Mentor March", cat:"Community", desc:"Pair every rookie with a veteran.", xp:58, coins:140},
+  {id:"MP45", title:"Peak Push", cat:"LIVE", desc:"Hit a combined viewer milestone.", xp:30, coins:50},
+  {id:"MP46", title:"Victory Vault", cat:"Battle", desc:"Bank a set number of wins as a squad.", xp:45, coins:70},
+  {id:"MP47", title:"Rally Cry", cat:"Team", desc:"Post a unified squad call-to-action.", xp:55, coins:90},
+  {id:"MP48", title:"Content Cascade", cat:"Content", desc:"Chain-post across the whole roster.", xp:65, coins:110},
+  {id:"MP49", title:"Full House", cat:"LIVE", desc:"Every ranger live at once for a photo finish.", xp:40, coins:130},
+  {id:"MP50", title:"Champions Circle", cat:"Team", desc:"Top rangers run a joint celebration LIVE.", xp:50, coins:150},
+];
+const DRILL_POOL=[
+  {id:"TP1", title:"Camera Confidence", cat:"Confidence", desc:"Practice holding eye contact with the lens for two minutes.", xp:30, coins:20},
+  {id:"TP2", title:"Hook Practice", cat:"Content", desc:"Write three scroll-stopping opening lines.", xp:40, coins:30},
+  {id:"TP3", title:"Battle Commentary", cat:"Battles", desc:"Narrate a battle out loud like a commentator.", xp:50, coins:40},
+  {id:"TP4", title:"Energy Control", cat:"Confidence", desc:"Practice raising and lowering your energy on cue.", xp:60, coins:50},
+  {id:"TP5", title:"Storytelling", cat:"Speaking", desc:"Tell a 60-second story with a clear beginning, middle, end.", xp:70, coins:60},
+  {id:"TP6", title:"Thumbnail Review", cat:"Branding", desc:"Audit and improve one thumbnail or cover.", xp:80, coins:25},
+  {id:"TP7", title:"Profile Audit", cat:"Branding", desc:"Tighten your bio, links, and pinned content.", xp:35, coins:35},
+  {id:"TP8", title:"Gift Callouts", cat:"Streaming", desc:"Practice smooth, genuine gift shoutouts.", xp:45, coins:45},
+  {id:"TP9", title:"Chat Engagement", cat:"Streaming", desc:"Reply to chat by name for a full segment.", xp:55, coins:55},
+  {id:"TP10", title:"Clip Editing", cat:"Content", desc:"Cut a 15-second clip from a recent stream.", xp:65, coins:20},
+  {id:"TP11", title:"Voice Warmup", cat:"Speaking", desc:"Run vocal warmups before going live.", xp:75, coins:30},
+  {id:"TP12", title:"Intro Script", cat:"Speaking", desc:"Draft a tight 10-second stream intro.", xp:30, coins:40},
+  {id:"TP13", title:"Battle Strategy", cat:"Battles", desc:"Plan your opening 30 seconds of a battle.", xp:40, coins:50},
+  {id:"TP14", title:"Pacing Practice", cat:"Speaking", desc:"Practice slowing down your delivery.", xp:50, coins:60},
+  {id:"TP15", title:"Brand Colors", cat:"Branding", desc:"Lock in a consistent color and font set.", xp:60, coins:25},
+  {id:"TP16", title:"Networking DM", cat:"Networking", desc:"Send one genuine outreach message to a creator.", xp:70, coins:35},
+  {id:"TP17", title:"Follow-Up", cat:"Networking", desc:"Reconnect with a creator you met recently.", xp:80, coins:45},
+  {id:"TP18", title:"Content Calendar", cat:"Content", desc:"Plan your next three posts.", xp:35, coins:55},
+  {id:"TP19", title:"Confidence Pose", cat:"Confidence", desc:"Practice a strong on-cam posture.", xp:45, coins:20},
+  {id:"TP20", title:"Call To Action", cat:"Speaking", desc:"Write three clear CTAs for your content.", xp:55, coins:30},
+  {id:"TP21", title:"Trend Scan", cat:"Content", desc:"Find three trends you can put your spin on.", xp:65, coins:40},
+  {id:"TP22", title:"Battle Recap", cat:"Battles", desc:"Break down what worked in your last battle.", xp:75, coins:50},
+  {id:"TP23", title:"Mic Check", cat:"Streaming", desc:"Test and dial in your audio levels.", xp:30, coins:60},
+  {id:"TP24", title:"Lighting Setup", cat:"Streaming", desc:"Improve your on-cam lighting.", xp:40, coins:25},
+  {id:"TP25", title:"Elevator Pitch", cat:"Networking", desc:"Nail a 15-second pitch about your brand.", xp:50, coins:35},
+  {id:"TP26", title:"Comment Ladder", cat:"Content", desc:"Write engaging replies to boost a post.", xp:60, coins:45},
+  {id:"TP27", title:"Overlay Polish", cat:"Branding", desc:"Refine your stream overlay or graphics.", xp:70, coins:55},
+  {id:"TP28", title:"Rapid Fire", cat:"Speaking", desc:"Answer ten quick questions with no filler.", xp:80, coins:20},
+  {id:"TP29", title:"Duet Drill", cat:"Content", desc:"Plan a duet concept end to end.", xp:35, coins:30},
+  {id:"TP30", title:"Positive Self-Talk", cat:"Confidence", desc:"List five wins from the past week.", xp:45, coins:40},
+  {id:"TP31", title:"Cross-Platform", cat:"Networking", desc:"Map your content to a second platform.", xp:55, coins:50},
+  {id:"TP32", title:"Battle Etiquette", cat:"Battles", desc:"Practice gracious wins and losses.", xp:65, coins:60},
+  {id:"TP33", title:"Retention Hook", cat:"Content", desc:"Design a mid-video hook to keep viewers.", xp:75, coins:25},
+  {id:"TP34", title:"Warm Intro", cat:"Streaming", desc:"Practice welcoming a guest on cam.", xp:30, coins:35},
+  {id:"TP35", title:"Signature Sign-Off", cat:"Branding", desc:"Create a memorable outro line.", xp:40, coins:45},
+  {id:"TP36", title:"Collab Pitch", cat:"Networking", desc:"Draft a collab proposal for a creator.", xp:50, coins:55},
+  {id:"TP37", title:"Breath Control", cat:"Confidence", desc:"Practice steady breathing to calm nerves.", xp:60, coins:20},
+  {id:"TP38", title:"Story Arc", cat:"Speaking", desc:"Outline a three-part content series.", xp:70, coins:30},
+  {id:"TP39", title:"Battle Prep", cat:"Battles", desc:"Build a pre-battle routine.", xp:80, coins:40},
+  {id:"TP40", title:"Analytics Peek", cat:"Content", desc:"Review last week's numbers for one insight.", xp:35, coins:50},
+  {id:"TP41", title:"Engagement Bait", cat:"Content", desc:"Craft a question post that sparks replies.", xp:45, coins:60},
+  {id:"TP42", title:"Stage Presence", cat:"Confidence", desc:"Practice big gestures and expressions.", xp:55, coins:25},
+  {id:"TP43", title:"Consistency Plan", cat:"Branding", desc:"Set a realistic posting schedule.", xp:65, coins:35},
+  {id:"TP44", title:"Icebreaker", cat:"Networking", desc:"Prepare three ways to start a conversation.", xp:75, coins:45},
+  {id:"TP45", title:"Live Rundown", cat:"Streaming", desc:"Script the flow of your next stream.", xp:30, coins:55},
+  {id:"TP46", title:"Punchy Titles", cat:"Content", desc:"Write five clickable titles.", xp:40, coins:20},
+  {id:"TP47", title:"Recovery Line", cat:"Confidence", desc:"Practice recovering smoothly from a mistake.", xp:50, coins:30},
+  {id:"TP48", title:"Shoutout Round", cat:"Streaming", desc:"Give five genuine shoutouts on cam.", xp:60, coins:40},
+  {id:"TP49", title:"Value Statement", cat:"Branding", desc:"Define what makes your content different.", xp:70, coins:50},
+  {id:"TP50", title:"Closing Strong", cat:"Speaking", desc:"Practice landing a confident ending.", xp:80, coins:60},
+];
+function _rotPick(pool,tag,per,idx){ if(!pool||!pool.length) return []; const order=_seedShuffle(pool,tag); const out=[]; for(let k=0;k<per;k++) out.push(order[((idx*per)+k)%order.length]); return out; }
+function activeMissions(){ return _rotPick(MISSION_POOL,'mission-order-v1',2,_dayNum()); }
+function todaysDrills(){ return _rotPick(DRILL_POOL,'drill-order-v1',3,_dayNum()); }
+function drillDoneToday(){ const u=me(); if(!u) return []; u.questDone=u.questDone||{}; u.questDone.drill=u.questDone.drill||{}; const k=_dayKey(); u.questDone.drill[k]=u.questDone.drill[k]||[]; return u.questDone.drill[k]; }
+function claimDrill(id){ const u=me(); const set=drillDoneToday(); if(set.includes(id)){ toast('Already done today','bad'); return; } if((u.pending||[]).some(p=>p.kind==='quest'&&p.qscope==='drill'&&p.ref===id)){ toast('Already submitted \u2014 waiting on review','bad'); return; } const c=DRILL_POOL.find(x=>x.id===id); if(!c) return; const note=(prompt('Show your work \u2014 add a link or note as proof (optional):')||'').trim(); u.pending=u.pending||[]; u.pending.push({pid:'s_'+Date.now().toString(36)+Math.floor(Math.random()*999), kind:'quest', qscope:'drill', ref:id, title:c.title, xp:c.xp, coins:c.coins, badge:null, note, t:Date.now()}); upsertProfile(u); render(); toast('Submitted for review \u23F3','gold'); }
+function poolMissionCards(){ const u=me(); if(!u) return ''; return activeMissions().map(m2=>{ const c=(typeof ACC!=='undefined'&&(ACC[m2.cat]||ACC.Other))||'#E12B38'; const done=(u.done||[]).includes(m2.id); const pend=(u.pending||[]).some(p=>p.kind==='challenge'&&p.ref===m2.id);
+  return `<div class="bg-panel border border-line rounded-2xl overflow-hidden hover-lift ${done?'opacity-70':''}" style="box-shadow:inset 4px 0 0 ${c}"><div class="p-4"><div class="flex items-center justify-between"><span class="text-[10px] px-2 py-0.5 rounded-full" style="background:${c}22;color:${c}">${m2.cat}</span><span class="text-[10px] px-2 py-0.5 rounded-full bg-orchid/15 text-orchid">Rotating</span></div><h3 class="font-display text-xl mt-2 ${done?'line-through text-steel':''}">${esc(m2.title)}</h3><p class="text-[12px] text-silver mt-1 leading-snug">${esc(m2.desc)}</p><div class="flex items-center justify-between mt-4"><div class="text-[11px] flex gap-3"><span class="text-orchid font-mono">+${m2.xp} Power</span><span class="text-gold font-mono">+${m2.coins} Energy</span></div>${done?'<span class="text-[11px] text-gold">✓ Done</span>':pend?'<span class="text-[11px] text-orchid">Pending</span>':`<button onclick="completeChallenge('${m2.id}')" class="text-xs px-3 py-1.5 rounded-lg bg-orchid/20 text-orchid hover:bg-orchid/30">Claim · approval</button>`}</div></div></div>`; }).join(''); }
+function poolDrillCards(){ const u=me(); if(!u) return ''; return todaysDrills().map((c,i)=>{ const col=['#E12B38','#2563EB','#FFC83D','#16A34A','#FF3D9A','#111114'][i%6]; const done=drillDoneToday().includes(c.id); const pend=(u.pending||[]).some(p=>p.kind==='quest'&&p.qscope==='drill'&&p.ref===c.id);
+  return `<div class="bg-panel border border-line rounded-2xl p-4 ${done?'opacity-70':''}" style="box-shadow:inset 4px 0 0 ${col}"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><div class="flex items-center gap-2"><span class="text-[10px] px-2 py-0.5 rounded-full" style="background:${col}22;color:${col}">${c.cat}</span><span class="text-[10px] px-2 py-0.5 rounded-full bg-orchid/15 text-orchid">Rotating</span></div><h3 class="font-display text-lg mt-1 ${done?'line-through text-steel':''}">${esc(c.title)}</h3><p class="text-[12px] text-silver mt-1 leading-snug">${esc(c.desc)}</p><div class="flex items-center gap-3 mt-2 text-[11px] flex-wrap"><span class="text-orchid font-mono">+${c.xp} Power</span><span class="text-gold font-mono">+${c.coins} Energy</span>${!done&&!pend?'<span class="text-steel/60">• needs owner approval</span>':''}</div></div>${done?`<div class="shrink-0 w-10 h-10 rounded-full grid place-items-center bg-gold/20 text-gold">${ICON.check.replace('w-full h-full','w-5 h-5')}</div>`:pend?'<div class="shrink-0 text-[10px] leading-tight px-2 py-1.5 rounded-lg bg-orchid/15 text-orchid text-center">Pending<br>review</div>':`<button onclick="claimDrill('${c.id}')" class="shrink-0 w-10 h-10 rounded-full grid place-items-center bg-raised border border-line text-steel hover:border-orchid hover:text-orchid">${ICON.check.replace('w-full h-full','w-5 h-5')}</button>`}</div></div>`; }).join(''); }
 function _dayKey(){ const d=new Date(); return d.getUTCFullYear()+'-'+(d.getUTCMonth()+1)+'-'+d.getUTCDate(); }
 function _weekKey(){ const d=new Date(); const oj=new Date(Date.UTC(d.getUTCFullYear(),0,1)); const wk=Math.ceil((((d-oj)/86400000)+oj.getUTCDay()+1)/7); return d.getUTCFullYear()+'-W'+wk; }
 function _seedShuffle(arr, seed){ const a=arr.slice(); let s=0; for(let k=0;k<seed.length;k++){ s=(s*31+seed.charCodeAt(k))>>>0; } for(let i=a.length-1;i>0;i--){ s=(s*1103515245+12345)>>>0; const j=s%(i+1); const t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
-function questPool(scope){ const cfg=(DB.app_config&&DB.app_config.questPool)||null; if(cfg&&cfg[scope]&&cfg[scope].length) return cfg[scope]; return scope==='daily'?DAILY_POOL:WEEKLY_POOL; }
-function todaysQuests(scope){ const pool=questPool(scope); const key=scope==='daily'?_dayKey():_weekKey(); const n=scope==='daily'?4:3; return _seedShuffle(pool,scope+key).slice(0,n); }
+function questPool(scope){ const cfg=(DB.app_config&&DB.app_config.questPool)||null; if(cfg&&cfg[scope]&&cfg[scope].length>=20) return cfg[scope]; return scope==='daily'?DAILY_POOL:WEEKLY_POOL; }
+function _dayNum(){ return Math.floor(Date.now()/86400000); }
+function _weekNum(){ return Math.floor(Date.now()/604800000); }
+function todaysQuests(scope){ const pool=questPool(scope); if(!pool.length) return []; const order=_seedShuffle(pool, scope+'-order-v3'); const n=scope==='daily'?3:2; const idx=scope==='daily'?_dayNum():_weekNum(); const out=[]; for(let k=0;k<n;k++){ out.push(order[((idx*n)+k)%order.length]); } return out; }
 function questDoneSet(scope){ const u=me(); if(!u) return []; u.questDone=u.questDone||{}; u.questDone[scope]=u.questDone[scope]||{}; const key=scope==='daily'?_dayKey():_weekKey(); u.questDone[scope][key]=u.questDone[scope][key]||[]; return u.questDone[scope][key]; }
 function completeQuest(scope,id){ const u=me(); const set=questDoneSet(scope); if(set.includes(id)) return; if((u.pending||[]).some(p=>p.kind==='quest'&&p.ref===id&&p.qscope===scope)){ toast('Already submitted \u2014 waiting on review','bad'); return; } const q=questPool(scope).find(x=>x.id===id)||(scope==='daily'?DAILY_POOL:WEEKLY_POOL).find(x=>x.id===id); if(!q) return; const note=(prompt('Show your work \u2014 add a link or note as proof (optional):')||'').trim(); u.pending=u.pending||[]; u.pending.push({pid:'s_'+Date.now().toString(36)+Math.floor(Math.random()*999), kind:'quest', ref:id, qscope:scope, title:q.title, xp:q.xp, coins:q.coins, badge:null, note, t:Date.now()}); upsertProfile(u); render(); toast('Submitted for review \u23F3','gold'); }
 function questBoard(){ const dq=todaysQuests('daily'), wq=todaysQuests('weekly'); const dset=questDoneSet('daily'), wset=questDoneSet('weekly');
   const card=(q,scope,set)=>{ const done=set.includes(q.id); const uu=me(); const pend=(uu.pending||[]).some(p=>p.kind==='quest'&&p.ref===q.id&&p.qscope===scope); const dis=done||pend; const lbl=done?'✓ Done':pend?'Pending':'Claim';
-    return `<div class="flex items-center gap-3 p-2.5 rounded-xl ${done?'bg-emerald-500/10':pend?'bg-orchid/10':'bg-raised'}"><span class="text-xl shrink-0">${q.glyph||'⚡'}</span><div class="min-w-0 flex-1"><div class="text-[13px] ${done?'text-steel line-through':'text-chalk'}">${esc(q.title)}</div><div class="text-[10px] text-steel">+${q.xp} Power · +${q.coins} Energy</div></div><button onclick="completeQuest('${scope}','${q.id}')" ${dis?'disabled':''} class="shrink-0 text-[11px] px-2.5 py-1 rounded-lg ${done?'bg-emerald-500/20 text-emerald-300':pend?'bg-orchid/20 text-orchid':'bg-orchid/20 text-orchid hover:bg-orchid/30'}">${lbl}</button></div>`; };
+    return `<div class="flex items-center gap-3 p-2.5 rounded-xl ${done?'bg-emerald-500/10':pend?'bg-orchid/10':'bg-raised'}"><span class="text-xl shrink-0">${q.glyph||'⚡'}</span><div class="min-w-0 flex-1"><div class="text-[13px] ${done?'text-steel line-through':'text-chalk'}">${esc(q.title)}</div><div class="text-[10px] text-steel">${q.diff?`<span class="px-1.5 py-0.5 rounded mr-1 font-bold" style="background:${q.diff==='Hard'?'#E12B3822':q.diff==='Medium'?'#FFC83D22':'#16A34A22'};color:${q.diff==='Hard'?'#E12B38':q.diff==='Medium'?'#FFC83D':'#16A34A'}">${q.diff}</span>`:''}+${q.xp} Power · +${q.coins} Energy</div></div><button onclick="completeQuest('${scope}','${q.id}')" ${dis?'disabled':''} class="shrink-0 text-[11px] px-2.5 py-1 rounded-lg ${done?'bg-emerald-500/20 text-emerald-300':pend?'bg-orchid/20 text-orchid':'bg-orchid/20 text-orchid hover:bg-orchid/30'}">${lbl}</button></div>`; };
   const dDone=dq.filter(q=>dset.includes(q.id)).length, wDone=wq.filter(q=>wset.includes(q.id)).length;
   return `<section class="bg-panel border border-line rounded-2xl p-5 mb-5"><div class="grid md:grid-cols-2 gap-5">
     <div><div class="flex items-center justify-between mb-2"><h3 class="font-display text-lg">Daily Quests <span class="text-[12px] text-steel font-body">${dDone}/${dq.length}</span></h3><span class="text-[10px] text-steel">fresh set daily</span></div><div class="space-y-2">${dq.map(q=>card(q,'daily',dset)).join('')}</div></div>

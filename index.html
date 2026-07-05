@@ -1448,7 +1448,7 @@ function saveChallengeForm(){
   editing=null; save(); render(); toast('Drill saved','gold');
 }
 function deleteChallenge(id){ if(!confirm('Delete this drill? It is removed from everyone\u2019s progress.')) return; DB.challenges=DB.challenges.filter(c=>c.id!==id); DB.members.forEach(m=>{ m.done=(m.done||[]).filter(x=>x!==id); m.pending=(m.pending||[]).filter(p=>p.ref!==id); }); editing=null; save(); render(); toast('Drill deleted'); }
-var battleFilter='all'; var calMonth=0, calSel=0; var scheduleOpen=false; var attnBattle=null; var grantMember=null; var RSVP_ENERGY=15, ATTEND_POWER=50, ATTEND_ENERGY=25;
+var battleFilter='all'; var calMonth=0, calSel=0; var scheduleOpen=false; var attnBattle=null; var grantMember=null; var tagSubmit=null; var RSVP_ENERGY=15, ATTEND_POWER=50, ATTEND_ENERGY=25;
 function openGrant(id){ grantMember=id; render(); setTimeout(()=>{ const a=document.getElementById('grant_amt'); if(a) a.focus(); },0); }
 function closeGrant(){ grantMember=null; render(); }
 function applyGrant(){ const u=me(); if(!u||u.role!=='Owner'){ toast('Only the Owner can grant','bad'); return; } const m=DB.members.find(x=>x.id===grantMember); if(!m) return;
@@ -1461,6 +1461,22 @@ function applyGrant(){ const u=me(); if(!u||u.role!=='Owner'){ toast('Only the O
 }
 function grantOverlay(){ if(!grantMember) return ''; const m=DB.members.find(x=>x.id===grantMember); if(!m) return ''; const IN2='w-full bg-raised border border-line rounded-xl px-3 py-2.5 text-sm text-chalk focus:border-orchid outline-none';
   return `<div class="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onclick="if(event.target===this)closeGrant()"><div class="bg-panel border border-line w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl p-5"><div class="flex items-center justify-between mb-1"><h3 class="font-display text-xl">Grant to ${esc(m.username)}</h3><button onclick="closeGrant()" class="text-steel hover:text-chalk text-2xl leading-none">×</button></div><p class="text-[12px] text-steel mb-4">Give a custom amount of Power or Energy.</p><div class="grid grid-cols-2 gap-3 mb-4"><div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Amount</label><input id="grant_amt" type="number" min="1" placeholder="500" onkeydown="if(event.key==='Enter')applyGrant()" class="${IN2}"></div><div><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Type</label><select id="grant_type" class="${IN2}"><option>Power</option><option>Energy</option></select></div></div><button onclick="applyGrant()" class="w-full py-3 rounded-xl font-bold text-ink bg-gradient-to-b from-[#ff5a4d] to-orchid hover:brightness-110">Grant</button></div></div>`;
+}
+function openTagSubmit(id){ tagSubmit=id; render(); setTimeout(()=>{ const t=document.getElementById('tag_txt'); if(t) t.focus(); },0); }
+function closeTagSubmit(){ tagSubmit=null; render(); }
+function _tagMission(id){ return DB.challenges.find(x=>x.id===id)||(typeof MISSION_POOL!=='undefined'?MISSION_POOL.concat(DRILL_POOL).find(x=>x.id===id):null); }
+function confirmTagSubmit(){ const u=me(); const id=tagSubmit; if(!id) return; const c=_tagMission(id); if(!c){ closeTagSubmit(); return; }
+  if(u.done.includes(id)){ toast('Already done','bad'); closeTagSubmit(); return; }
+  if((u.pending||[]).some(p=>p.kind==='challenge'&&p.ref===id)){ toast('Already submitted \u2014 waiting on review','bad'); closeTagSubmit(); return; }
+  const sel=document.getElementById('tag_pick'), txt=document.getElementById('tag_txt');
+  let who=((txt&&txt.value)||'').trim(); if(!who && sel && sel.value) who=sel.value;
+  who=who.replace(/^@+/,'').trim(); if(!who){ toast('Pick a ranger or type a @username','bad'); return; }
+  const verb=c.verb||'Supported'; const note=verb+' @'+who;
+  u.pending=u.pending||[]; u.pending.push({pid:'s_'+Date.now().toString(36)+Math.floor(Math.random()*999), kind:'challenge', ref:id, title:c.title, xp:c.xp, coins:c.coins, badge:c.badge||null, note, t:Date.now()});
+  upsertProfile(u); tagSubmit=null; render(); toast('Submitted for review \u23F3','gold'); }
+function tagOverlay(){ if(!tagSubmit) return ''; const c=_tagMission(tagSubmit); if(!c) return ''; const IN2='w-full bg-raised border border-line rounded-xl px-3 py-2.5 text-sm text-chalk focus:border-orchid outline-none';
+  const rangers=[...(DB.members||[])].sort((a,b)=>a.username.localeCompare(b.username)).map(m=>`<option value="${esc(m.username)}">${esc(m.username)}</option>`).join('');
+  return `<div class="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onclick="if(event.target===this)closeTagSubmit()"><div class="bg-panel border border-line w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl p-5"><div class="flex items-center justify-between mb-1"><h3 class="font-display text-xl">${esc(c.title)}</h3><button onclick="closeTagSubmit()" class="text-steel hover:text-chalk text-2xl leading-none">\u00d7</button></div><p class="text-[12px] text-steel mb-4">${esc(c.desc||'')}</p><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Pick a ranger</label><select id="tag_pick" class="${IN2} mb-3"><option value="">\u2014 choose a squadmate \u2014</option>${rangers}</select><label class="block text-[11px] uppercase tracking-wide text-steel mb-1">Or type any @username</label><input id="tag_txt" placeholder="@username" onkeydown="if(event.key==='Enter')confirmTagSubmit()" class="${IN2} mb-4"><button onclick="confirmTagSubmit()" class="w-full py-3 rounded-xl font-bold text-ink bg-gradient-to-b from-[#ff5a4d] to-orchid hover:brightness-110">Submit for review</button></div></div>`;
 }
 function battleRsvpData(id){ DB.reactions=DB.reactions||{}; const k='br:'+id; const d=DB.reactions[k]=DB.reactions[k]||{}; d.rsvp=d.rsvp||{}; d.attended=d.attended||{}; d.paidR=d.paidR||{}; d.paidA=d.paidA||{}; return d; }
 async function saveBattleRsvp(id){ try{ const k='br:'+id; const { error } = await sb.from('reactions').upsert({key:k, data:DB.reactions[k]}); if(error) console.warn('rsvp save', error.message); }catch(e){} }
@@ -2077,6 +2093,7 @@ function completeChallenge(id){
   if(u.done.includes(id)){ toast('Already done','bad'); return; }
   if((u.pending||[]).some(p=>p.kind==='challenge'&&p.ref===id)){ toast('Already submitted \u2014 waiting on review','bad'); return; }
   const c=DB.challenges.find(x=>x.id===id)||(typeof MISSION_POOL!=='undefined'?MISSION_POOL.concat(DRILL_POOL).find(x=>x.id===id):null); if(!c) return;
+  if(c.tag){ openTagSubmit(id); return; }
   const note=(prompt('Show your work \u2014 add a link or note as proof for the owner (optional):')||'').trim();
   u.pending=u.pending||[]; u.pending.push({pid:'s_'+Date.now().toString(36)+Math.floor(Math.random()*999), kind:'challenge', ref:id, title:c.title, xp:c.xp, coins:c.coins, badge:c.badge||null, note, t:Date.now()});
   upsertProfile(u); render(); toast('Submitted for review \u2014 the owner will confirm it \u23F3','gold');
@@ -2930,6 +2947,15 @@ const WEEKLY_POOL=[
   {id:"w50", title:"Squad Photo Day", desc:"Rally the crew for a group post.", xp:120, coins:130, glyph:"\ud83d\udcf8"},
 ];
 const MISSION_POOL=[
+  {id:"HM1", title:"Heart Me Back", cat:"Community", desc:"Go heart a squadmate's latest post, then tag who you supported.", xp:25, coins:45, tag:true},
+  {id:"HM2", title:"Show Some Love", cat:"Community", desc:"Drop hearts on a squadmate's LIVE and tag them when you're done.", xp:30, coins:50, tag:true},
+  {id:"HM3", title:"Daily Heart Drop", cat:"Community", desc:"Heart 3 recent videos from one squadmate and tag them.", xp:30, coins:55, tag:true},
+  {id:"HM4", title:"Comment & Heart", cat:"Community", desc:"Leave a real comment plus a heart on a squadmate's video, tag who.", xp:35, coins:60, tag:true},
+  {id:"HM5", title:"Follow & Support", cat:"Community", desc:"Follow a squadmate you haven't yet and tag them here.", xp:40, coins:65, tag:true},
+  {id:"HM6", title:"Return the Love", cat:"Community", desc:"Heart back everyone who supported your last LIVE; tag one you got.", xp:35, coins:55, tag:true},
+  {id:"HM7", title:"Share a Ranger's LIVE \u00d7 50", cat:"Community", desc:"Send 50 shares to a squadmate's LIVE, then tag which ranger you supported.", xp:40, coins:70, tag:true, verb:"Shared 50\u00d7"},
+  {id:"HM8", title:"Share a Random's LIVE \u00d7 50", cat:"Community", desc:"Send 50 shares to a creator outside the House to spread the love; tag who you shared.", xp:30, coins:55, tag:true, verb:"Shared 50\u00d7"},
+  {id:"HM9", title:"Scout a Recruit", cat:"Community", desc:"Find a creator who'd be a great fit and tag their @username as a potential recruit.", xp:45, coins:85, tag:true, verb:"Recruit"},
   {id:"MP1", title:"Squad Battle Hour", cat:"LIVE", desc:"Get the whole squad live and battling within the same hour.", xp:30, coins:50},
   {id:"MP2", title:"Battle Marathon", cat:"Battle", desc:"Run back-to-back battles all evening.", xp:45, coins:70},
   {id:"MP3", title:"Support Blitz", cat:"Community", desc:"Flood five squadmates' LIVEs with support.", xp:55, coins:90},
@@ -3123,6 +3149,7 @@ function render(){
   try{ const u=me(); document.body.classList.toggle('no-anim', !!(u&&u.prefs&&u.prefs.animations===false)); }catch(e){}
   if(typeof paletteOpen!=='undefined' && paletteOpen && typeof paletteOverlay==='function'){ try{ document.getElementById('app').insertAdjacentHTML('beforeend', paletteOverlay()); const inp=document.getElementById('palInput'); if(inp) inp.focus(); }catch(e){} }
   try{ if(grantMember){ document.getElementById('app').insertAdjacentHTML('beforeend', grantOverlay()); } }catch(e){}
+  try{ if(tagSubmit){ document.getElementById('app').insertAdjacentHTML('beforeend', tagOverlay()); const t=document.getElementById('tag_txt'); if(t) t.focus(); } }catch(e){}
   if(window._celebrate){ const c=window._celebrate; window._celebrate=null; setTimeout(()=>celebrate(c.title,c.sub),60); }
 }
 (function(){ try{

@@ -1495,10 +1495,26 @@ async function addScheduled(){ const g=id=>{const e=document.getElementById(id);
 async function importSchedule(){ const ta=document.getElementById('sch_bulk'); const raw=(ta&&ta.value||'').trim(); if(!raw){ toast('Paste your schedule first','bad'); return; }
   const fsel=document.getElementById('sch_fighter'); const fid=(fsel&&fsel.value)||me().id;
   const now=new Date(); const rows=[]; let lastWhen=null, skipped=0;
-  raw.split(/\n+/).forEach(line=>{ line=line.replace(/\r/g,'').trim(); if(!line) return;
+  const allLines = raw.split(/\n+/).map(l=>l.replace(/\r/g,'')).filter(l=>l.trim()!=='');
+  const isHeader = l => /opponent|\bopp\b/i.test(l) && /(diamond|tier|agency|power|18\+|date|opp\.?\s*manager)/i.test(l);
+  // Build a column map from the header row so the sheet's column ORDER doesn't matter
+  let map=null, msep='\t';
+  const hLine = allLines.find(isHeader);
+  if(hLine){
+    msep = hLine.includes('|') ? '|' : '\t';
+    const hc = hLine.split(msep).map(x=>x.trim().toLowerCase());
+    const idx = re => hc.findIndex(c=>re.test(c));
+    let ti=idx(/^est\b|eastern|^et\b/); if(ti<0)ti=idx(/est/); if(ti<0)ti=idx(/\btime\b/); if(ti<0)ti=idx(/cst|pst|\bct\b|\bpt\b/);
+    map={ date:idx(/date/), time:ti, opp:idx(/opponent|^opp\b|username/), dia:idx(/diamond|tier/), pow:idx(/power|pwr/), adult:idx(/18\+|adult|nsfw/), agency:idx(/agency|community/) };
+  }
+  allLines.forEach(line=>{ if(!line.trim() || isHeader(line)) return;
     let date='',timeStr='',opp='',dia='',pow='',adult='',agency='';
-    if(line.includes('|')){ const p=line.split('|').map(x=>x.trim()); date=p[0]||''; timeStr=p[1]||''; opp=p[2]||''; agency=p[3]||''; dia=p[4]||''; pow=p[5]||''; adult=p[6]||''; }
-    else {
+    if(map){
+      const cells=line.split(msep); const at=k=>(k>=0&&k<cells.length)?String(cells[k]).trim():'';
+      date=at(map.date); timeStr=at(map.time); opp=at(map.opp); dia=at(map.dia); pow=at(map.pow); adult=at(map.adult); agency=at(map.agency);
+    } else if(line.includes('|')){
+      const p=line.split('|').map(x=>x.trim()); date=p[0]||''; timeStr=p[1]||''; opp=p[2]||''; agency=p[3]||''; dia=p[4]||''; pow=p[5]||''; adult=p[6]||'';
+    } else {
       const cells=line.split('\t').map(x=>x.trim());
       date=cells.find(c=>/\d{1,2}\/\d{1,2}/.test(c))||'';
       const times=cells.filter(c=>/\d{1,2}:\d{2}\s*(AM|PM)?/i.test(c));
@@ -1507,14 +1523,15 @@ async function importSchedule(){ const ta=document.getElementById('sch_bulk'); c
       const rest=cells.slice(lti+1).map(x=>x.trim()).filter(x=>x && x!=='\u2014' && x!=='-');
       opp=rest[0]||''; dia=rest[1]||''; pow=rest[2]||''; adult=rest[3]||''; agency=(rest.length>1)?rest[rest.length-1]:'';
     }
+    [dia,pow,adult,agency]=[dia,pow,adult,agency].map(v=>(v==='\u2014'||v==='-')?'':v);
     const dm=String(date).match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
     const tm=String(timeStr).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-    if(!dm && !tm && !opp) return;                 // blank / header-ish line
+    if(!dm && !tm && !opp) return;
     let hh=20,mm=0; if(tm){ hh=+tm[1]; mm=+tm[2]; const ap=(tm[3]||'').toUpperCase(); if(ap==='PM'&&hh<12)hh+=12; if(ap==='AM'&&hh===12)hh=0; }
     let when=null;
     if(dm){ const mo=+dm[1], da=+dm[2]; let yr=dm[3]?(+dm[3]<100?2000+ +dm[3]:+dm[3]):now.getFullYear(); when=new Date(yr,mo-1,da,hh,mm); lastWhen=when; }
-    else if(lastWhen){ when=new Date(lastWhen.getFullYear(),lastWhen.getMonth(),lastWhen.getDate(),hh,mm); }   // same day as the row above (blank date cell)
-    if(!when || isNaN(when.getTime()) || !opp){ skipped++; return; }   // not a real battle row
+    else if(lastWhen){ when=new Date(lastWhen.getFullYear(),lastWhen.getMonth(),lastWhen.getDate(),hh,mm); }
+    if(!when || isNaN(when.getTime()) || !opp){ skipped++; return; }
     const nt=[dia?('Diamonds: '+dia):'', pow?('Power-Ups: '+pow):'', adult?('18+: '+adult):''].filter(Boolean).join(' \u00b7 ');
     rows.push({ fighter_id:fid, opponent:opp||'Unknown', community:agency||'', result:'Scheduled', score:'', platform:'TikTok', battle_date:when.toISOString(), link:'', note:nt, opp_img:null });
   });
@@ -1550,7 +1567,7 @@ function scheduleOverlay(){ if(!scheduleOpen) return '';
       <button id="sch_add" onclick="addScheduled()" class="w-full py-3 rounded-xl font-bold text-ink bg-gradient-to-b from-[#ff5a4d] to-orchid hover:brightness-110 mb-4">Add to schedule</button>
       <div class="border-t border-line pt-4 mb-4">
         <div class="text-[11px] uppercase tracking-wide text-steel mb-1">Or paste a whole week</div>
-        <p class="text-[11px] text-steel mb-2">Paste rows straight from your schedule sheet (with tabs), or one per line: <span class="text-silver">MM/DD | 8:30 PM | opponent | agency | diamonds | power-ups | 18+</span></p>
+        <p class="text-[11px] text-steel mb-2">Paste rows straight from your sheet — <span class="text-silver">include the header row</span> so columns map correctly. Or type one per line: <span class="text-silver">MM/DD | 8:30 PM | opponent | agency | diamonds | power-ups | 18+</span></p>
         <textarea id="sch_bulk" rows="6" placeholder="07/01 | 8:30 PM | swolemigoking | rare | 20-30K | Yes | No" class="${IN2} resize-none font-mono text-[12px]"></textarea>
         <button id="sch_import" onclick="importSchedule()" class="w-full mt-2 py-2.5 rounded-xl font-semibold text-chalk bg-raised border border-line hover:border-orchid">Import all</button>
       </div>
@@ -2594,7 +2611,7 @@ function battleCalendar(){ if(!calMonth) calMonth=_startOfMonth(Date.now());
   let cells=''; for(let i=0;i<startDow;i++) cells+='<div></div>';
   for(let day=1;day<=daysIn;day++){ const cellMs=new Date(y,mo,day).getTime(); const di=items.filter(x=>_sameDay(x.when,cellMs));
     const hasB=di.some(x=>x.type==='battle'), hasM=di.some(x=>x.type==='mission'); const isToday=_sameDay(cellMs,todayMs), isSel=calSel&&_sameDay(cellMs,calSel);
-    cells+=`<button onclick="calPick(${cellMs})" class="aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-[12px] transition ${isSel?'bg-orchid/25 text-chalk':isToday?'bg-raised text-gold':'text-silver hover:bg-raised/60'}"><span>${day}</span><span class="flex gap-0.5 h-1.5">${di.filter(x=>x.type==='battle').slice(0,3).map(x=>`<span class="w-1.5 h-1.5 rounded-full" style="background:${x.color}"></span>`).join('')}${hasM?'<span class="w-1.5 h-1.5 rounded-full" style="background:#FFC83D"></span>':''}</span></button>`; }
+    cells+=`<button onclick="calPick(${cellMs})" class="aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-[12px] transition ${isSel?'bg-orchid/25 text-chalk':isToday?'bg-raised text-gold':'text-silver hover:bg-raised/60'}"><span>${day}</span><span class="flex gap-0.5 h-1.5">${di.filter(x=>x.type==='battle').slice(0,3).map(x=>`<span class="w-1.5 h-1.5 rounded-full" style="background:${x.color||'#E12B38'}"></span>`).join('')}${hasM?'<span class="w-1.5 h-1.5 rounded-full" style="background:#FFC83D"></span>':''}</span></button>`; }
   const selMs=calSel||0; const selItems=selMs?items.filter(x=>_sameDay(x.when,selMs)).sort((a,b)=>a.when-b.when):[];
   const selHdr=selMs?new Date(selMs).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'}):'';
   const list=selMs?(selItems.length?selItems.map(it=>{ const c=it.type==='battle'?'#E12B38':'#FFC83D'; return `<div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-raised/60 border border-line"><span class="w-2 h-2 rounded-full shrink-0" style="background:${c}"></span><div class="min-w-0 flex-1"><div class="text-[13px] text-chalk truncate">${esc(it.title)}</div><div class="text-[11px] text-steel truncate">${tzLine(it.when)} \u00b7 ${esc(it.sub||'')}</div></div></div>`; }).join(''):`<div class="text-[12px] text-steel px-1 py-2">Nothing on this day.</div>`):'';

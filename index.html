@@ -1202,7 +1202,7 @@ function viewDashboard(){
       </div>
     </div>
 
-    ${onboardChecklist(u)}
+    ${streakNudge(u)}${onboardChecklist(u)}
     ${questBoard()}
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
       ${statCard('spark','Power', fmt(u.xp), '#E12B38')}
@@ -1449,7 +1449,7 @@ function saveChallengeForm(){
   editing=null; save(); render(); toast('Drill saved','gold');
 }
 function deleteChallenge(id){ if(!confirm('Delete this drill? It is removed from everyone\u2019s progress.')) return; DB.challenges=DB.challenges.filter(c=>c.id!==id); DB.members.forEach(m=>{ m.done=(m.done||[]).filter(x=>x!==id); m.pending=(m.pending||[]).filter(p=>p.ref!==id); }); editing=null; save(); render(); toast('Drill deleted'); }
-var battleFilter='all'; var calMonth=0, calSel=0; var scheduleOpen=false; var attnBattle=null; var grantMember=null; var tagSubmit=null; var RSVP_ENERGY=15, ATTEND_POWER=50, ATTEND_ENERGY=25;
+var battleFilter='all'; var calMonth=0, calSel=0; var scheduleOpen=false; var attnBattle=null; var grantMember=null; var tagSubmit=null; var reviewFilter='all'; var RSVP_ENERGY=15, ATTEND_POWER=50, ATTEND_ENERGY=25;
 function openGrant(id){ grantMember=id; render(); setTimeout(()=>{ const a=document.getElementById('grant_amt'); if(a) a.focus(); },0); }
 function closeGrant(){ grantMember=null; render(); }
 function applyGrant(){ const u=me(); if(!u||u.role!=='Owner'){ toast('Only the Owner can grant','bad'); return; } const m=DB.members.find(x=>x.id===grantMember); if(!m) return;
@@ -2036,16 +2036,16 @@ function viewAdmin(){
       <div class="flex flex-wrap gap-1.5">${chips}</div></div>`;
   }).join('');
 
-  const subs=[]; DB.members.forEach(m=>(m.pending||[]).forEach(p=>subs.push({m,p}))); subs.sort((a,b)=>a.p.t-b.p.t);
-  const reviewBody = subs.length ? subs.map(({m,p})=>{
+  const subs=[]; DB.members.forEach(m=>(m.pending||[]).forEach(p=>subs.push({m,p}))); subs.sort((a,b)=>a.p.t-b.p.t); const _RF=(typeof reviewFilter!=='undefined')?reviewFilter:'all'; const fsubs=_RF==='all'?subs:subs.filter(({p})=>_subCat(p)===_RF);
+  const reviewBody = fsubs.length ? fsubs.map(({m,p})=>{
     const kl=p.kind==='achv'?'Achievement':p.kind==='challenge'?'Mission':(p.qscope==='drill'?'Drill':p.qscope==='weekly'?'Weekly':'Quest'); const kc=p.kind==='achv'?'bg-gold/15 text-gold':p.kind==='challenge'?'bg-rose/15 text-rose':(p.qscope==='drill'?'bg-emerald-500/15 text-emerald-300':'bg-orchid/15 text-orchid');
     return `<div class="flex items-start gap-3 p-4 bg-panel border border-line rounded-2xl">
       <button onclick="openProfile('${m.id}')" aria-label="${esc(m.username)}" class="shrink-0 mt-0.5">${avatar(m.username,32,colorHex(m.color))}</button>
       <div class="min-w-0 flex-1"><div class="text-[13px] text-chalk">${esc(m.username)} <span class="text-steel">submitted</span> <span class="text-silver">${esc(p.title||p.ref||'a task')}</span> <span class="text-[10px] px-1.5 py-0.5 rounded ${kc}">${kl}</span></div>
       <div class="text-[11px] text-steel">${timeAgo(p.t)} \u00b7 +${p.xp||0} Power${p.coins?', +'+p.coins+' Energy':''}</div>
       ${p.note?`<div class="text-[12px] text-silver mt-1.5 p-2 rounded-lg bg-raised border border-line">\u201C${esc(p.note)}\u201D</div>`:`<div class="text-[11px] text-steel/60 mt-1">No proof note attached</div>`}</div>
-      ${isStaff?`<div class="flex flex-col gap-2 shrink-0"><button onclick="approveSubmission('${m.id}','${p.pid}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30">Approve</button><button onclick="declineSubmission('${m.id}','${p.pid}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-rose/15 text-rose hover:bg-rose/25">Decline</button></div>`:'<span class="text-[11px] text-steel shrink-0">owner reviews</span>'}
-    </div>`; }).join('') : `<div class="text-sm text-steel py-10 text-center">No submissions waiting \u2014 the squad\u2019s all caught up. \uD83C\uDF89</div>`;
+      ${isStaff?`<div class="flex flex-col gap-2 shrink-0"><button onclick="approveSubmission('${m.id}','${p.pid}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30">Approve</button><button onclick="declineSubmission('${m.id}','${p.pid}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-rose/15 text-rose hover:bg-rose/25">Decline</button><button onclick="approveCustom('${m.id}','${p.pid}')" class="text-[10px] text-steel hover:text-gold">\u00b1 reward</button></div>`:'<span class="text-[11px] text-steel shrink-0">owner reviews</span>'}
+    </div>`; }).join('') : (subs.length ? '<div class="text-sm text-steel py-8 text-center">Nothing in this filter \u2014 try another tab.</div>' : `<div class="text-sm text-steel py-10 text-center">No submissions waiting \u2014 the squad\u2019s all caught up. \uD83C\uDF89</div>`);
   const tab=(id,label)=>`<button onclick="adminView='${id}';render()" class="px-3 py-1.5 rounded-lg text-xs ${adminView===id?'tab-on':'bg-raised text-steel'}">${label}</button>`;
 
   app.innerHTML = shell(`
@@ -2060,7 +2060,7 @@ function viewAdmin(){
       <div class="flex gap-2 flex-wrap">${tab('members','Members')}${tab('quests','Quests')}${tab('missions','By Mission')}${tab('review','Submissions'+(subs.length?' ('+subs.length+')':''))}</div>
       ${behind?`<button onclick="nudgeAllBehind()" class="text-xs px-3 py-1.5 rounded-lg bg-gold/20 text-gold hover:bg-gold/30">\u23F0 Nudge everyone behind (${behind})</button>`:''}
     </div>
-    ${adminView==='quests' ? questAdmin() : adminView==='review' ? `<div class="space-y-2.5 max-w-2xl">${reviewBody}</div>` : adminView==='members' ? `
+    ${adminView==='quests' ? questAdmin() : adminView==='review' ? `<div class="max-w-2xl">${reviewControls(subs)}<div class="space-y-2.5">${reviewBody}</div></div>` : adminView==='members' ? `
       <div class="bg-panel border border-line rounded-2xl overflow-x-auto">
         <table class="w-full text-left min-w-[640px]">
           <thead><tr class="text-[11px] uppercase tracking-wide text-steel border-b border-line">
@@ -2100,17 +2100,21 @@ function completeChallenge(id){
   u.pending=u.pending||[]; u.pending.push({pid:'s_'+Date.now().toString(36)+Math.floor(Math.random()*999), kind:'challenge', ref:id, title:c.title, xp:c.xp, coins:c.coins, badge:c.badge||null, note, t:Date.now()});
   upsertProfile(u); render(); toast('Submitted for review \u2014 the owner will confirm it \u23F3','gold');
 }
-function approveSubmission(mid,pid){
-  const m=DB.members.find(x=>x.id===mid); if(!m) return;
-  const p=(m.pending||[]).find(x=>x.pid===pid); if(!p){ render(); return; }
-  m.pending=(m.pending||[]).filter(x=>x.pid!==pid);
+function _applyApproval(m,p){
+  m.pending=(m.pending||[]).filter(x=>x.pid!==p.pid);
   if(p.kind==='quest'){ m.questDone=m.questDone||{}; m.questDone[p.qscope]=m.questDone[p.qscope]||{}; const key=p.qscope==='weekly'?_weekKey():_dayKey(); m.questDone[p.qscope][key]=m.questDone[p.qscope][key]||[]; if(!m.questDone[p.qscope][key].includes(p.ref)) m.questDone[p.qscope][key].push(p.ref); }
   else if(p.kind==='achv'){ m._achv=m._achv||[]; if(!m._achv.includes(p.ref)) m._achv.push(p.ref); }
   else { if(!m.done.includes(p.ref)) m.done.push(p.ref); }
   let _xp=p.xp||0, _co=p.coins||0; if(m.boostNext){ _xp*=2; m.boostNext=false; } if(activePerk(m,'r17')) _co*=2;
   awardXP(m,_xp,'Approved: '+p.title); awardCoins(m,_co,'Approved: '+p.title); if(p.badge) earnBadge(m,p.badge);
-  pushInbox(mid,'message',`\u2705 \u201C${p.title}\u201D approved \u2014 +${p.xp||0} Power, +${p.coins||0} Energy!`);
-  upsertOther(m); render(); toast(`Approved ${m.username}\u2019s submission`,'gold');
+  pushInbox(m.id,'message',`\u2705 \u201C${p.title}\u201D approved \u2014 +${p.xp||0} Power, +${p.coins||0} Energy!`);
+}
+function _subCat(p){ return p.kind==='achv'?'achievements':p.kind==='challenge'?'missions':(p.qscope==='drill'?'trainings':'quests'); }
+function setReviewFilter(v){ reviewFilter=v; render(); }
+function approveAll(){ const u=me(); if(!u||(u.role!=='Owner'&&u.role!=='Manager')){ toast('Owners & managers only','bad'); return; } const RF=(typeof reviewFilter!=='undefined')?reviewFilter:'all'; const affected=new Set(); let n=0; DB.members.forEach(m=>{ (m.pending||[]).slice().forEach(p=>{ if(RF!=='all'&&_subCat(p)!==RF) return; _applyApproval(m,p); affected.add(m); n++; }); }); affected.forEach(m=>upsertOther(m)); render(); toast(n?('Approved '+n+' submission'+(n===1?'':'s')+' \u26A1'):'Nothing to approve here', n?'gold':'bad'); }
+function approveCustom(mid,pid){ const m=DB.members.find(x=>x.id===mid); if(!m) return; const p=(m.pending||[]).find(x=>x.pid===pid); if(!p) return; const np=prompt('Power to award:', p.xp||0); if(np===null) return; const nc=prompt('Energy to award:', p.coins||0); if(nc===null) return; p.xp=Math.max(0,parseInt(np)||0); p.coins=Math.max(0,parseInt(nc)||0); approveSubmission(mid,pid); }
+function reviewControls(subs){ const u=me(); const staff=!!(u&&(u.role==='Owner'||u.role==='Manager')); const RF=(typeof reviewFilter!=='undefined')?reviewFilter:'all'; const cats=[['all','All'],['quests','Quests'],['trainings','Trainings'],['missions','Missions'],['achievements','Achievements']]; const cnt=c=>c==='all'?subs.length:subs.filter(({p})=>_subCat(p)===c).length; const chips=cats.map(([v,l])=>{ const n=cnt(v); return `<button onclick="setReviewFilter('${v}')" class="text-[11px] px-2.5 py-1 rounded-full ${RF===v?'bg-orchid text-ink font-semibold':'bg-raised text-steel hover:text-chalk'}">${l}${n?' '+n:''}</button>`; }).join(''); const visN=cnt(RF); return `<div class="flex items-center justify-between gap-2 flex-wrap mb-3"><div class="flex gap-1.5 flex-wrap">${chips}</div>${staff&&visN?`<button onclick="approveAll()" class="text-[11px] px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 font-semibold">Approve ${RF==='all'?'all':RF} (${visN})</button>`:''}</div>`; }
+function approveSubmission(mid,pid){ const m=DB.members.find(x=>x.id===mid); if(!m) return; const p=(m.pending||[]).find(x=>x.pid===pid); if(!p){ render(); return; } _applyApproval(m,p); upsertOther(m); render(); toast(`Approved ${m.username}\u2019s submission`,'gold');
 }
 function declineSubmission(mid,pid){
   const m=DB.members.find(x=>x.id===mid); if(!m) return;
@@ -2436,7 +2440,7 @@ function viewFeed(){
   app.innerHTML = shell(`
     ${banner('What the squad’s up to','The Buzz','Everyone’s recent growth in one stream. Cheer your squad on with 👑💎✨.')}
     <div class="grid lg:grid-cols-3 gap-4">
-      <div class="lg:col-span-2 space-y-2.5">${feedComposer()}${postsHTML}${postsHTML&&all.length?'<div class="text-[11px] uppercase tracking-[.18em] text-steel pt-2 pb-1">Squad activity</div>':''}${rows}</div>
+      <div class="lg:col-span-2 space-y-2.5">${feedComposer()}${postsHTML?'':'<div class="bg-panel border border-line border-dashed rounded-2xl p-8 text-center"><div class="text-3xl mb-2">\U0001F4AC</div><div class="text-sm text-chalk font-semibold">The Buzz is quiet</div><div class="text-[12px] text-steel mt-1">Be the first \u2014 share a win, drop your LIVE link, or hype a squadmate.</div></div>'}${postsHTML}${postsHTML&&all.length?'<div class="text-[11px] uppercase tracking-[.18em] text-steel pt-2 pb-1">Squad activity</div>':''}${rows}</div>
       <div class="space-y-4">
         <section class="bg-panel border border-line rounded-2xl p-4"><h3 class="font-display text-lg mb-2">Squad Highlights</h3><div class="-mx-1">${highlights}</div></section>
         <section class="relative overflow-hidden border rounded-2xl p-5" style="border-color:rgba(255,200,61,.28);background:linear-gradient(162deg, rgba(255,200,61,.12), #14121C 72%)"><div class="text-[10px] uppercase tracking-[.2em] text-gold/80 mb-3 text-center">🌟 Creator Spotlight</div>${spotlight}</section>
@@ -2999,6 +3003,9 @@ function subscribeContent(){ if(window._subC||!sb) return; try{ window._subC=sb.
   .on('postgres_changes',{event:'*',schema:'public',table:'reactions'},()=>contentRefresh())
   .subscribe(); }catch(e){} }
 /* ======================================================= */
+function streakNudge(u){ if(!u) return ''; const today=u.last_checkin===todayKey(); if(today || (u.streak||0)<2) return ''; const fz=(u.freezes||0);
+  return `<section class="rounded-2xl p-4 mb-5 flex items-center gap-3" style="background:linear-gradient(90deg,rgba(225,43,56,.18),rgba(255,200,61,.08));box-shadow:inset 0 0 0 1px rgba(225,43,56,.35)"><div class="text-2xl shrink-0">\U0001F525</div><div class="min-w-0 flex-1"><div class="text-[14px] font-semibold text-chalk">Your ${u.streak}-day streak is at risk</div><div class="text-[12px] text-steel">Morph in today to keep it alive.${fz>0?` You\u2019ve got ${fz} freeze${fz===1?'':'s'} as backup \u2014 but why waste one?`:' No freezes left \u2014 don\u2019t break the chain!'}</div></div><button onclick="checkIn()" class="shrink-0 px-4 py-2 rounded-xl font-semibold text-sm text-ink bg-gradient-to-b from-[#ff5a4d] to-orchid hover:brightness-110">Morph in</button></section>`;
+}
 function onboardChecklist(u){
   if(u._hideChecklist) return '';
   const steps=[

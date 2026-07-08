@@ -258,7 +258,7 @@ function rowToMember(r){ const p=r.prefs||{};
     prefs:{ animations:p.animations!==false, nudges:p.nudges!==false, publicProfile:p.publicProfile!==false, sounds:!!p.sounds },
     rsvps:r.rsvps||[], done:r.done||[], inbox:r.inbox||[],
     joined_at: r.joined_at?new Date(r.joined_at).getTime():Date.now(),
-    feed:p._feed||[], xpLog:[], purchases:p._purchases||[], tag:p._tag||'', _ttvideo:p._ttvideo||'', _spotDay:p._spotDay||'', _features:p._features||0, _followers:p._followers||0, _followerGoal:p._followerGoal||0, perks:p._perks||{}, boostNext:!!p._boostNext, questDone:p._questDone||{}, roomLog:[], freezes:1, pending:p._pending||[], _achv:p._achv||[], onboarded:true,
+    feed:p._feed||[], xpLog:[], purchases:p._purchases||[], tag:p._tag||'', _ttvideo:p._ttvideo||'', _spotDay:p._spotDay||'', _features:p._features||0, _followers:p._followers||0, _followerGoal:p._followerGoal||0, perks:p._perks||{}, boostNext:!!p._boostNext, questDone:p._questDone||{}, roomLog:[], freezes:1, pending:p._pending||[], _achv:p._achv||[], onboarded:true, _vaultClaim:p._vaultClaim||null,
     _lore:!!p._lore, _hideChecklist:!!p._hideChecklist };
 }
 function memberToRow(u){ const pr=u.prefs||{};
@@ -268,7 +268,7 @@ function memberToRow(u){ const pr=u.prefs||{};
     avatar_url:u.avatarImg||null, banner_url:u.bannerImg||null,
     badges:u.badges||[], socials:u.socials||{},
     prefs:{ animations:pr.animations!==false, nudges:pr.nudges!==false, publicProfile:pr.publicProfile!==false, sounds:!!pr.sounds,
-            _last_checkin:u.last_checkin||null, _purchases:u.purchases||[], _tag:u.tag||'', _ttvideo:u._ttvideo||'', _spotDay:u._spotDay||'', _features:u._features||0, _followers:u._followers||0, _followerGoal:u._followerGoal||0, _perks:u.perks||{}, _boostNext:!!u.boostNext, _feed:(u.feed||[]).slice(0,40), _questDone:u.questDone||{}, _pending:u.pending||[], _achv:u._achv||[], _lore:!!u._lore, _hideChecklist:!!u._hideChecklist },
+            _last_checkin:u.last_checkin||null, _purchases:u.purchases||[], _tag:u.tag||'', _ttvideo:u._ttvideo||'', _spotDay:u._spotDay||'', _features:u._features||0, _followers:u._followers||0, _followerGoal:u._followerGoal||0, _perks:u.perks||{}, _boostNext:!!u.boostNext, _feed:(u.feed||[]).slice(0,40), _questDone:u.questDone||{}, _pending:u.pending||[], _achv:u._achv||[], _vaultClaim:u._vaultClaim||null, _lore:!!u._lore, _hideChecklist:!!u._hideChecklist },
     rsvps:u.rsvps||[], done:u.done||[], inbox:u.inbox||[] };
 }
 function upsertProfile(u){ if(!u||!sb) return; sb.from('profiles').update(memberToRow(u)).eq('id',u.id).then(r=>{ if(r.error) console.warn('save', r.error.message); }); }
@@ -1205,7 +1205,7 @@ function viewDashboard(){
       </div>
     </div>
 
-    ${streakNudge(u)}${onboardChecklist(u)}
+    ${vaultBanner()}${streakNudge(u)}${onboardChecklist(u)}
     ${questBoard()}
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
       ${statCard('spark','Power', fmt(u.xp), '#E12B38')}
@@ -1863,11 +1863,11 @@ function viewStore(){
           <button onclick="buy('${featPick.id}')" class="text-sm font-bold px-5 py-2 rounded-xl text-ink ${aff0?'sheen':''}" style="background:linear-gradient(180deg,#FFE89A,#FFC83D)">${aff0?'Redeem now':'Keep earning'}</button>
         </div>
       </div>
-    </div>`:`<div class="rounded-2xl border border-gold/30 bg-gold/5 p-5 mb-5 text-center"><div class="font-display text-xl text-gold">Everything unlocked \U0001F3C6</div><div class="text-[12px] text-silver">You own every reward in the House. Legend.</div></div>`;
+    </div>`:`<div class="rounded-2xl border border-gold/30 bg-gold/5 p-5 mb-5 text-center"><div class="font-display text-xl text-gold">Everything unlocked \uD83C\uDFC6</div><div class="text-[12px] text-silver">You own every reward in the House. Legend.</div></div>`;
   const next=DB.store.filter(x=>!owned.includes(x.id)&&u.coins<x.cost).sort((a,b)=>a.cost-b.cost)[0];
   const nextPct=next?Math.min(100,Math.round(u.coins/next.cost*100)):100;
   const nextBlock=next?`<div class="mt-3 pt-3 border-t border-line"><div class="flex items-center justify-between text-[11px] mb-1"><span class="text-steel">Next unlock</span><span class="text-chalk">${esc(next.name)}</span></div><div class="h-2 rounded-full overflow-hidden" style="background:#241f2e"><div class="h-full rounded-full" style="width:${nextPct}%;background:linear-gradient(90deg,#FFE89A,#FFC83D)"></div></div><div class="text-[10px] text-steel mt-1">${fmt(next.cost-u.coins)} Energy to go</div></div>`:'';
-  const earn=[['\U0001F4C5','Morph in daily','+10 Energy, more with streaks'],['\U0001F525','Finish training drills','Energy on every drill'],['\U0001F3A4','Join Comms rooms','+8 Energy, first join each day'],['\U0001F3AF','Complete missions','Energy when you RSVP & show up'],['\u2694\uFE0F','RSVP & attend battles','Energy to RSVP, bonus when you show up']]
+  const earn=[['\uD83D\uDCC5','Morph in daily','+10 Energy, more with streaks'],['\uD83D\uDD25','Finish training drills','Energy on every drill'],['\uD83C\uDFA4','Join Comms rooms','+8 Energy, first join each day'],['\uD83C\uDFAF','Complete missions','Energy when you RSVP & show up'],['\u2694\uFE0F','RSVP & attend battles','Energy to RSVP, bonus when you show up']]
     .map(x=>`<div class="flex items-start gap-2.5 py-1.5"><span class="text-base leading-none mt-0.5">${x[0]}</span><div><div class="text-[12px] text-chalk">${x[1]}</div><div class="text-[11px] text-steel">${x[2]}</div></div></div>`).join('');
   app.innerHTML = shell(`
     ${banner('Spend what you earn','Store','Everything unlocks with Energy you earn in the House \u2014 no purchases, ever. Grind the ladder, cash in the rewards.')}
@@ -1885,7 +1885,7 @@ function viewStore(){
           <div class="rounded-xl p-3 mb-2" style="background:linear-gradient(150deg, rgba(255,200,61,.14), #1B1827)">
             <div class="flex items-center gap-3"><span class="text-2xl">\u26A1</span><div class="flex-1"><div class="font-display text-3xl leading-none gold-text">${fmt(u.coins)}</div><div class="text-[11px] text-steel">Energy \u2014 spend it here</div></div></div>
           </div>
-          <div class="flex items-center gap-3 py-1.5 px-1"><span class="text-xl">\U0001F451</span><div class="flex-1"><div class="font-display text-xl leading-none" style="color:#E12B38">${fmt(u.xp)}</div><div class="text-[11px] text-steel">Power \u2014 your rank & level</div></div></div>
+          <div class="flex items-center gap-3 py-1.5 px-1"><span class="text-xl">\uD83D\uDC51</span><div class="flex-1"><div class="font-display text-xl leading-none" style="color:#E12B38">${fmt(u.xp)}</div><div class="text-[11px] text-steel">Power \u2014 your rank & level</div></div></div>
           ${nextBlock}
         </section>
         <section class="bg-panel border border-line rounded-2xl p-5">
@@ -2369,7 +2369,7 @@ function feedComposer(){ const u=me(); const d=postDraft;
     </div>
   </section>`;
 }
-function togglePin(id){ const u=me(); if(!u||(u.role!=='Owner'&&u.role!=='Manager')){ toast('Owners & managers only','bad'); return; } DB.app_config=DB.app_config||{}; const cur=DB.app_config.pinnedPost||null; DB.app_config.pinnedPost=(cur===id)?null:id; try{ sb.from('app_config').upsert({id:1,data:DB.app_config}).then(x=>{ if(x&&x.error) toast('Pin save failed: '+x.error.message,'bad'); }); }catch(e){} render(); toast(DB.app_config.pinnedPost?'Pinned to top \U0001F4CC':'Unpinned','gold'); }
+function togglePin(id){ const u=me(); if(!u||(u.role!=='Owner'&&u.role!=='Manager')){ toast('Owners & managers only','bad'); return; } DB.app_config=DB.app_config||{}; const cur=DB.app_config.pinnedPost||null; DB.app_config.pinnedPost=(cur===id)?null:id; try{ sb.from('app_config').upsert({id:1,data:DB.app_config}).then(x=>{ if(x&&x.error) toast('Pin save failed: '+x.error.message,'bad'); }); }catch(e){} render(); toast(DB.app_config.pinnedPost?'Pinned to top \uD83D\uDCCC':'Unpinned','gold'); }
 function postCard(p){ const u=me(); const a=DB.members.find(m=>m.id===p.authorId); if(!a) return '';
   const pinnedId=(DB.app_config&&DB.app_config.pinnedPost)||null; const isPinned=pinnedId===p.id; const staff=!!(u&&(u.role==='Owner'||u.role==='Manager'));
   const canDel = u.id===p.authorId || u.role==='Owner';
@@ -2381,7 +2381,7 @@ function postCard(p){ const u=me(); const a=DB.members.find(m=>m.id===p.authorId
   return `<div class="bg-panel border ${isPinned?'border-gold/40':'border-line'} rounded-2xl p-4">
     <div class="flex items-start gap-3"><button onclick="openProfile('${a.id}')" class="shrink-0">${avatarOf(a,38,colorHex(a.color))}</button>
       <div class="min-w-0 flex-1">
-        <div class="flex items-center justify-between gap-2"><div class="text-[13px]"><button onclick="openProfile('${a.id}')" class="font-semibold text-chalk hover:text-orchid">${esc(a.username)}</button> <span class="text-steel text-[11px]">· ${timeAgo(p.t)}</span>${isPinned?' <span class="text-[10px] font-bold text-gold">\U0001F4CC PINNED</span>':''}</div><div class="flex items-center gap-2 shrink-0">${staff?`<button onclick="togglePin('${p.id}')" class="text-steel hover:text-gold text-[11px]">${isPinned?'Unpin':'Pin'}</button>`:''}${canDel?`<button onclick="deletePost('${p.id}')" class="text-steel hover:text-rose text-[11px]">Delete</button>`:''}</div></div>
+        <div class="flex items-center justify-between gap-2"><div class="text-[13px]"><button onclick="openProfile('${a.id}')" class="font-semibold text-chalk hover:text-orchid">${esc(a.username)}</button> <span class="text-steel text-[11px]">· ${timeAgo(p.t)}</span>${isPinned?' <span class="text-[10px] font-bold text-gold">\uD83D\uDCCC PINNED</span>':''}</div><div class="flex items-center gap-2 shrink-0">${staff?`<button onclick="togglePin('${p.id}')" class="text-steel hover:text-gold text-[11px]">${isPinned?'Unpin':'Pin'}</button>`:''}${canDel?`<button onclick="deletePost('${p.id}')" class="text-steel hover:text-rose text-[11px]">Delete</button>`:''}</div></div>
         ${p.text?`<p class="text-[14px] text-silver mt-1 whitespace-pre-wrap leading-snug">${esc(p.text)}</p>`:''}
         ${p.img?`<img src="${p.img}" alt="" class="mt-2 rounded-xl border border-line max-h-80 w-auto"/>`:''}
         ${pollHTML}
@@ -2443,7 +2443,7 @@ function viewFeed(){
   app.innerHTML = shell(`
     ${banner('What the squad’s up to','The Buzz','Everyone’s recent growth in one stream. Cheer your squad on with 👑💎✨.')}
     <div class="grid lg:grid-cols-3 gap-4">
-      <div class="lg:col-span-2 space-y-2.5">${feedComposer()}${postsHTML?'':'<div class="bg-panel border border-line border-dashed rounded-2xl p-8 text-center"><div class="text-3xl mb-2">\U0001F4AC</div><div class="text-sm text-chalk font-semibold">The Buzz is quiet</div><div class="text-[12px] text-steel mt-1">Be the first \u2014 share a win, drop your LIVE link, or hype a squadmate.</div></div>'}${postsHTML}${postsHTML&&all.length?'<div class="text-[11px] uppercase tracking-[.18em] text-steel pt-2 pb-1">Squad activity</div>':''}${rows}</div>
+      <div class="lg:col-span-2 space-y-2.5">${feedComposer()}${postsHTML?'':'<div class="bg-panel border border-line border-dashed rounded-2xl p-8 text-center"><div class="text-3xl mb-2">\uD83D\uDCAC</div><div class="text-sm text-chalk font-semibold">The Buzz is quiet</div><div class="text-[12px] text-steel mt-1">Be the first \u2014 share a win, drop your LIVE link, or hype a squadmate.</div></div>'}${postsHTML}${postsHTML&&all.length?'<div class="text-[11px] uppercase tracking-[.18em] text-steel pt-2 pb-1">Squad activity</div>':''}${rows}</div>
       <div class="space-y-4">
         <section class="bg-panel border border-line rounded-2xl p-4"><h3 class="font-display text-lg mb-2">Squad Highlights</h3><div class="-mx-1">${highlights}</div></section>
         <section class="relative overflow-hidden border rounded-2xl p-5" style="border-color:rgba(255,200,61,.28);background:linear-gradient(162deg, rgba(255,200,61,.12), #14121C 72%)"><div class="text-[10px] uppercase tracking-[.2em] text-gold/80 mb-3 text-center">🌟 Creator Spotlight</div>${spotlight}</section>
@@ -2736,12 +2736,12 @@ function clearPic(kind){ const u=me(); if(kind==='banner') u.bannerImg=null; els
 const VAULT_MILESTONES=[25000,50000,75000,100000,125000,150000,175000,200000];
 function vaultDefault(){ return {
   status:'PREPARING', goal:200000, ratio:100, diamonds:0,
-  vaults:VAULT_MILESTONES.map((m,i)=>({milestone:m, title:i<7?('Vault '+(i+1)):'Grand Vault', prize:'', prizeDesc:'', status:'Locked', winnerId:null})),
+  vaults:VAULT_MILESTONES.map((m,i)=>({milestone:m, title:i<7?('Vault '+(i+1)):'Grand Vault', prize:'', prizeDesc:'', status:'Locked', winnerId:null, delivered:false, tracking:'', notes:''})),
   contrib:{}, winners:[], notified:{}, audit:[]
 };}
 function vaultState(){ DB.app_config=DB.app_config||{}; if(!DB.app_config.vault) DB.app_config.vault=vaultDefault(); const v=DB.app_config.vault;
   v.goal=v.goal||200000; v.ratio=v.ratio||100; v.diamonds=v.diamonds||0; v.status=v.status||'PREPARING'; v.contrib=v.contrib||{}; v.winners=v.winners||[]; v.notified=v.notified||{}; v.audit=v.audit||[];
-  if(!Array.isArray(v.vaults)||v.vaults.length!==8) v.vaults=vaultDefault().vaults;
+  if(!Array.isArray(v.vaults)||v.vaults.length!==8) v.vaults=vaultDefault().vaults; v.vaults.forEach(vt=>{ if(vt.delivered===undefined)vt.delivered=false; if(vt.tracking===undefined)vt.tracking=''; });
   return v; }
 function vaultSave(){ if(sb){ try{ sb.from('app_config').upsert({id:1,data:DB.app_config}).then(x=>{ if(x&&x.error) toast('Vault save failed: '+x.error.message,'bad'); }); }catch(e){} } }
 function vaultKeys(id){ const v=vaultState(); return Math.floor((v.contrib[id]||0)/(v.ratio||100)); }
@@ -2766,6 +2766,8 @@ function vaultAddCoins(){ if(!vaultRequireAdmin()) return; const v=vaultState();
 function vaultEditPrize(i){ if(!vaultRequireAdmin()) return; const v=vaultState(); const vt=v.vaults[i]; if(!vt) return; const nm=prompt('Prize name for '+vt.title+':', vt.prize||''); if(nm===null) return; const ds=prompt('Prize description (optional):', vt.prizeDesc||''); vt.prize=nm.trim(); vt.prizeDesc=(ds===null?vt.prizeDesc:ds.trim()); vaultAudit('Edit prize', vt.title, vt.prize, ''); vaultSave(); render(); toast('Prize saved','gold'); }
 function vaultUnlock(i){ if(!vaultRequireAdmin()) return; const v=vaultState(); const vt=v.vaults[i]; if(!vt||vt.status==='Awarded') return; vt.status='Unlocked'; vaultAudit('Manual unlock', vt.title,'Unlocked',''); vaultSave(); render(); }
 function vaultLock(i){ if(!vaultRequireAdmin()) return; const v=vaultState(); const vt=v.vaults[i]; if(!vt||vt.status==='Awarded') return; vt.status='Locked'; vaultAudit('Manual lock', vt.title,'Locked',''); vaultSave(); render(); }
+function vaultClaim(i){ const u=me(); const v=vaultState(); const vt=v.vaults[i]; if(!vt||!vt.winnerId){ return; } if(vt.winnerId!==u.id){ toast('Only the winner can claim this prize','bad'); return; } if(vt.claimed){ toast('Already claimed','bad'); return; } vt.claimed=true; const note=prompt('Add a note or shipping detail for the admin (optional):',''); if(note && note.trim()) vt.claimNote=note.trim(); vaultAudit('Prize claimed', vt.title, u.username, vt.claimNote||''); vaultSave(); render(); toast('Prize claimed! \uD83C\uDF89','gold'); }
+function vaultMarkDelivered(i){ if(!vaultRequireAdmin()) return; const v=vaultState(); const vt=v.vaults[i]; if(!vt||!vt.winnerId) return; const tr=prompt('Tracking number (optional):', vt.tracking||''); if(tr===null) return; vt.tracking=tr.trim(); vt.delivered=true; const mm=DB.members.find(x=>x.id===vt.winnerId); vaultAudit('Delivered', vt.title, (mm?mm.username:'')+(vt.tracking?(' / '+vt.tracking):''), ''); vaultSave(); render(); toast('Marked delivered','gold'); }
 
 /* ---- drawing (one win per member, Grand Vault last) ---- */
 function _vaultEntries(){ const v=vaultState(); const list=[]; Object.keys(v.contrib).forEach(id=>{ const k=Math.floor((v.contrib[id]||0)/(v.ratio||100)); for(let i=0;i<k;i++) list.push(id); }); return list; }
@@ -2789,6 +2791,10 @@ function vaultDraw(i){ if(!vaultRequireAdmin()) return; const v=vaultState(); co
 function vaultRedraw(i){ if(!vaultRequireAdmin()) return; const v=vaultState(); const vt=v.vaults[i]; if(!vt||!vt.winnerId) return; if(!confirm('Redraw the winner for '+vt.title+'? The current winner will be removed and a new one drawn.')) return; v.winners=v.winners.filter(w=>w.vaultIdx!==i); vt.winnerId=null; vt.status='Unlocked'; vaultAudit('Redraw', vt.title,'reset','admin'); vaultSave(); vaultDraw(i); }
 function vaultReset(){ if(!vaultRequireAdmin()) return; if(!confirm('End & reset The Vault? Current results are archived to history, then progress, keys, entries and winners reset for a fresh event.')) return; const v=vaultState(); DB.app_config.vaultHistory=DB.app_config.vaultHistory||[]; DB.app_config.vaultHistory.unshift({ended:Date.now(), goal:v.goal, diamonds:v.diamonds, winners:v.winners.map(w=>({title:(v.vaults[w.vaultIdx]||{}).title, prize:(v.vaults[w.vaultIdx]||{}).prize||'', member:((DB.members.find(m=>m.id===w.memberId)||{}).username)||w.memberId}))}); DB.app_config.vault=vaultDefault(); vaultSave(); render(); toast('Vault archived & reset','gold'); }
 
+function vaultClaim(i){ const u=me(); const v=vaultState(); const vt=v.vaults[i]; if(!vt||vt.winnerId!==u.id){ toast('Only the winner can claim this','bad'); return; } if(u._vaultClaim && u._vaultClaim.i===i){ toast('Already claimed','gold'); return; } const info=prompt('You won '+(vt.prize||vt.title)+'! Where should we send it? (shipping address, @handle, or email)',''); if(info===null) return; if(!info.trim()){ toast('Add delivery details to claim','bad'); return; } u._vaultClaim={ i, title:vt.title, prize:vt.prize||'', info:info.trim(), at:Date.now() }; if(typeof upsertProfile==='function') upsertProfile(u); render(); toast('Prize claimed \uD83C\uDF89 \u2014 the House got your details','gold'); }
+function vaultMarkDelivered(i){ if(!vaultRequireAdmin()) return; const v=vaultState(); const vt=v.vaults[i]; if(!vt) return; vt.delivered=!vt.delivered; vaultAudit('Delivery', vt.title, vt.delivered?'Delivered':'Not delivered','admin'); vaultSave(); render(); }
+function vaultSetTracking(i){ if(!vaultRequireAdmin()) return; const v=vaultState(); const vt=v.vaults[i]; if(!vt) return; const t=prompt('Tracking number / delivery note for '+vt.title+':', vt.tracking||''); if(t===null) return; vt.tracking=t.trim(); vaultAudit('Tracking', vt.title, vt.tracking,'admin'); vaultSave(); render(); toast('Tracking saved','gold'); }
+function vaultBanner(){ try{ if(typeof vaultState!=='function') return ''; const v=vaultState(); if(v.status==='PREPARING' && !isVaultAdmin()) return ''; const pct=vaultPct(); return `<button onclick="route('vault')" class="w-full text-left rounded-2xl p-4 mb-5 border border-gold/40 hover:border-gold transition" style="background:linear-gradient(120deg,rgba(225,43,56,.16),rgba(255,200,61,.10))"><div class="flex items-center justify-between mb-1.5"><div class="text-[13px] font-bold text-chalk">\uD83D\uDD10 THE VAULT <span class="text-[10px] font-normal text-steel">\u00b7 ${v.status}</span></div><div class="text-[12px] font-bold text-gold">${pct}%</div></div><div class="h-2 rounded-full bg-ink overflow-hidden"><div class="h-full rounded-full" style="width:${pct}%;background:linear-gradient(90deg,#E12B38,#FFC83D)"></div></div><div class="text-[11px] text-steel mt-1.5">\uD83D\uDC8E ${v.diamonds.toLocaleString()} / ${v.goal.toLocaleString()} Diamonds \u2014 tap to contribute & see your keys \u2192</div></button>`; }catch(e){ return ''; } }
 /* ---- view ---- */
 function viewVault(){ const u=me(); const v=vaultState(); const admin=isVaultAdmin();
   const pct=vaultPct(); const total=vaultTotalKeys(); const myKeys=u?vaultKeys(u.id):0; const chance=total>0?((myKeys/total)*100):0;
@@ -2803,6 +2809,7 @@ function viewVault(){ const u=me(); const v=vaultState(); const admin=isVaultAdm
       ${vt.prize?`<div class="text-[12px] text-silver mt-2">\uD83C\uDF81 ${esc(vt.prize)}</div>`:'<div class="text-[11px] text-steel mt-2 italic">Prize TBA</div>'}
       ${vt.prizeDesc?`<div class="text-[11px] text-steel mt-0.5">${esc(vt.prizeDesc)}</div>`:''}
       ${won?`<div class="text-[12px] text-gold mt-2 font-semibold">\uD83C\uDF8A Winner: ${esc(won.username)}</div>`:''}
+      ${won && u && won.id===u.id ? ((won._vaultClaim && won._vaultClaim.i===i) ? `<div class="text-[11px] text-emerald-300 mt-2">Claimed \u2713${vt.delivered?(' \u00b7 Delivered'+(vt.tracking?(' \u00b7 '+esc(vt.tracking)):'')):' \u00b7 awaiting delivery'}</div>` : `<button onclick="vaultClaim(${i})" class="mt-2 w-full text-[11px] px-3 py-1.5 rounded-lg bg-gold/20 text-gold font-bold">\uD83C\uDF81 Claim your prize</button>`) : ''}${admin && won ? `<div class="mt-2 pt-2 border-t border-line/30 text-[11px]">${(won._vaultClaim && won._vaultClaim.i===i)?`<div class="text-steel">Ship to: <span class="text-silver">${esc(won._vaultClaim.info)}</span></div>`:`<div class="text-steel italic">Winner hasn\u2019t claimed yet</div>`}<div class="flex gap-1.5 mt-1"><button onclick="vaultMarkDelivered(${i})" class="text-[10px] px-2 py-1 rounded ${vt.delivered?'bg-emerald-500/20 text-emerald-300':'bg-raised text-steel'}">${vt.delivered?'Delivered \u2713':'Mark delivered'}</button><button onclick="vaultSetTracking(${i})" class="text-[10px] px-2 py-1 rounded bg-raised text-steel">Tracking#</button></div>${vt.tracking?`<div class="text-steel mt-1">Tracking: ${esc(vt.tracking)}</div>`:''}</div>`:''}
       ${admin?`<div class="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-line/50">
         <button onclick="vaultEditPrize(${i})" class="text-[10px] px-2 py-1 rounded bg-raised text-steel hover:text-chalk">Edit prize</button>
         ${vt.status==='Locked'?`<button onclick="vaultUnlock(${i})" class="text-[10px] px-2 py-1 rounded bg-emerald-500/20 text-emerald-300">Unlock</button>`:''}
@@ -2822,7 +2829,7 @@ function viewVault(){ const u=me(); const v=vaultState(); const admin=isVaultAdm
       <button onclick="vaultReset()" class="text-[11px] px-3 py-1.5 rounded-lg bg-rose/15 text-rose">End & reset event</button>
       ${v.audit.length?`<div class="pt-2 border-t border-line/50"><div class="text-[10px] uppercase tracking-[.15em] text-steel mb-1">Audit log (latest)</div>${v.audit.slice(0,8).map(a=>`<div class="text-[11px] text-steel">${new Date(a.ts).toLocaleString()} \u00b7 ${esc(a.user)} \u00b7 ${esc(a.action)}${(a.old!==''||a.new!=='')?(' ('+esc(a.old)+' \u2192 '+esc(a.new)+')'):''}${a.reason?(' \u00b7 '+esc(a.reason)):''}</div>`).join('')}</div>`:''}
     </div></details>`:'';
-  return `<div class="max-w-3xl mx-auto">
+  app.innerHTML = shell(`<div class="max-w-3xl mx-auto">
     <div class="flex items-center justify-between gap-3 mb-1"><h1 class="font-hero text-3xl orchid-text">THE VAULT</h1>${statusBadge}</div>
     <p class="text-[13px] text-steel mb-4">Help the House hit ${v.goal.toLocaleString()} Diamonds. Every 100 Coins you contribute = 1 Vault Key = 1 entry into the drawings. Every member can play.</p>
     <div class="rounded-2xl border border-line bg-panel p-5 mb-5">
@@ -2843,7 +2850,7 @@ function viewVault(){ const u=me(); const v=vaultState(); const admin=isVaultAdm
       <div class="text-[11px] text-steel mt-2 pt-2 border-t border-line/50">Total keys in play: ${total} \u00b7 Contributors: ${board.length}</div>
     </div>
     ${adminPanel}
-  </div>`;
+  </div>`);
 }
 /* =================== END THE VAULT =================== */
 
@@ -3047,11 +3054,11 @@ const AUTO_RULES={
  "Reach Bronze":s=>s.lvl>=5,"Reach Silver":s=>s.lvl>=10,"Reach Gold":s=>s.lvl>=15,"Reach Platinum":s=>s.lvl>=20,"Reach Diamond":s=>s.lvl>=28,"Reach Elite":s=>s.lvl>=35,"Reach Legend":s=>s.lvl>=40
 };
 const AUTO_ACHV=new Set(Object.keys(AUTO_RULES));
-function checkAchievements(u){ if(!u) return false; u._achv=u._achv||[]; const st=_achvStats(u); let changed=false; ACHIEVEMENTS.forEach(a=>{ const rule=AUTO_RULES[a.title]; if(!rule||u._achv.includes(a.id)) return; if(rule(st)){ u._achv.push(a.id); if(typeof awardXP==='function') awardXP(u,a.xp,'Achievement: '+a.badge); if(typeof awardCoins==='function') awardCoins(u,a.coins,'Achievement: '+a.badge); if(typeof pushInbox==='function') pushInbox(u.id,'message','\U0001F3C5 Achievement unlocked: '+a.badge+' \u2014 +'+a.xp+' Power, +'+a.coins+' Energy!'); changed=true; } }); return changed; }
+function checkAchievements(u){ if(!u) return false; u._achv=u._achv||[]; const st=_achvStats(u); let changed=false; ACHIEVEMENTS.forEach(a=>{ const rule=AUTO_RULES[a.title]; if(!rule||u._achv.includes(a.id)) return; if(rule(st)){ u._achv.push(a.id); if(typeof awardXP==='function') awardXP(u,a.xp,'Achievement: '+a.badge); if(typeof awardCoins==='function') awardCoins(u,a.coins,'Achievement: '+a.badge); if(typeof pushInbox==='function') pushInbox(u.id,'message','\uD83C\uDFC5 Achievement unlocked: '+a.badge+' \u2014 +'+a.xp+' Power, +'+a.coins+' Energy!'); changed=true; } }); return changed; }
 function claimAchv(id){ const u=me(); if(!u) return; u._achv=u._achv||[]; if(u._achv.includes(id)){ toast('Already earned','bad'); return; } if((u.pending||[]).some(p=>p.kind==='achv'&&p.ref===id)){ toast('Already submitted \u2014 waiting on review','bad'); return; } const a=ACHIEVEMENTS.find(x=>x.id===id); if(!a) return; const note=(prompt('Add your proof \u2014 '+(a.proof||'a screenshot')+' (paste a link or note):')||'').trim(); if(!note){ toast('Add your proof to submit','bad'); return; } u.pending=u.pending||[]; u.pending.push({pid:'s_'+Date.now().toString(36)+Math.floor(Math.random()*999), kind:'achv', ref:id, title:a.title, xp:a.xp, coins:a.coins, badge:null, note, t:Date.now()}); upsertProfile(u); render(); toast('Submitted for review \u23F3','gold'); }
 function viewTrophies(){ const u=me(); if(!u) return ''; const earned=u._achv||[]; const cats=[...new Set(ACHIEVEMENTS.map(a=>a.cat))]; const total=ACHIEVEMENTS.length, got=ACHIEVEMENTS.filter(a=>earned.includes(a.id)).length;
   const card=(a)=>{ const done=earned.includes(a.id); const pend=(u.pending||[]).some(p=>p.kind==='achv'&&p.ref===a.id);
-    return `<div class="bg-panel border ${done?'border-gold/40':'border-line'} rounded-xl p-3 flex items-start gap-3"><div class="shrink-0 w-10 h-10 rounded-full grid place-items-center ${done?'bg-gold/20 text-gold':'bg-raised text-steel'}">${done?'\U0001F3C5':'\U0001F512'}</div><div class="min-w-0 flex-1"><div class="text-[13px] font-semibold text-chalk">${esc(a.badge)}</div><div class="text-[11px] text-silver leading-snug">${esc(a.title)} \u2014 ${esc(a.desc)}</div><div class="text-[10px] text-steel mt-1">+${a.xp} Power \u00b7 +${a.coins} Energy \u00b7 Proof: ${esc(a.proof)}</div></div><div class="shrink-0 self-center">${done?'<span class="text-[10px] text-gold font-bold">EARNED</span>':AUTO_ACHV.has(a.title)?'<span class="text-[10px] text-emerald-300" title="Unlocks automatically from your stats">⚡ Auto</span>':pend?'<span class="text-[10px] text-orchid">Pending</span>':`<button onclick="claimAchv('${a.id}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-orchid/20 text-orchid hover:bg-orchid/30">Claim</button>`}</div></div>`; };
+    return `<div class="bg-panel border ${done?'border-gold/40':'border-line'} rounded-xl p-3 flex items-start gap-3"><div class="shrink-0 w-10 h-10 rounded-full grid place-items-center ${done?'bg-gold/20 text-gold':'bg-raised text-steel'}">${done?'\uD83C\uDFC5':'\uD83D\uDD12'}</div><div class="min-w-0 flex-1"><div class="text-[13px] font-semibold text-chalk">${esc(a.badge)}</div><div class="text-[11px] text-silver leading-snug">${esc(a.title)} \u2014 ${esc(a.desc)}</div><div class="text-[10px] text-steel mt-1">+${a.xp} Power \u00b7 +${a.coins} Energy \u00b7 Proof: ${esc(a.proof)}</div></div><div class="shrink-0 self-center">${done?'<span class="text-[10px] text-gold font-bold">EARNED</span>':AUTO_ACHV.has(a.title)?'<span class="text-[10px] text-emerald-300" title="Unlocks automatically from your stats">⚡ Auto</span>':pend?'<span class="text-[10px] text-orchid">Pending</span>':`<button onclick="claimAchv('${a.id}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-orchid/20 text-orchid hover:bg-orchid/30">Claim</button>`}</div></div>`; };
   const sections=cats.map(c=>{ const items=ACHIEVEMENTS.filter(a=>a.cat===c); const cg=items.filter(a=>earned.includes(a.id)).length; return `<section class="mb-5"><h3 class="font-display text-lg mb-2">${esc(c)} <span class="text-[12px] text-steel font-body">${cg}/${items.length}</span></h3><div class="grid sm:grid-cols-2 gap-2">${items.map(card).join('')}</div></section>`; }).join('');
   return `<div class="max-w-4xl mx-auto"><div class="flex items-center justify-between mb-4"><div><h1 class="font-display text-3xl">Achievements</h1><p class="text-steel text-sm">Permanent milestones \u2014 earn the badge, keep it forever.</p></div><div class="text-right"><div class="font-display text-2xl text-gold">${got}/${total}</div><div class="text-[11px] text-steel">unlocked</div></div></div>${sections}</div>`;
 }
@@ -3122,7 +3129,7 @@ function subscribeContent(){ if(window._subC||!sb) return; try{ window._subC=sb.
   .subscribe(); }catch(e){} }
 /* ======================================================= */
 function streakNudge(u){ if(!u) return ''; const today=u.last_checkin===todayKey(); if(today || (u.streak||0)<2) return ''; const fz=(u.freezes||0);
-  return `<section class="rounded-2xl p-4 mb-5 flex items-center gap-3" style="background:linear-gradient(90deg,rgba(225,43,56,.18),rgba(255,200,61,.08));box-shadow:inset 0 0 0 1px rgba(225,43,56,.35)"><div class="text-2xl shrink-0">\U0001F525</div><div class="min-w-0 flex-1"><div class="text-[14px] font-semibold text-chalk">Your ${u.streak}-day streak is at risk</div><div class="text-[12px] text-steel">Morph in today to keep it alive.${fz>0?` You\u2019ve got ${fz} freeze${fz===1?'':'s'} as backup \u2014 but why waste one?`:' No freezes left \u2014 don\u2019t break the chain!'}</div></div><button onclick="checkIn()" class="shrink-0 px-4 py-2 rounded-xl font-semibold text-sm text-ink bg-gradient-to-b from-[#ff5a4d] to-orchid hover:brightness-110">Morph in</button></section>`;
+  return `<section class="rounded-2xl p-4 mb-5 flex items-center gap-3" style="background:linear-gradient(90deg,rgba(225,43,56,.18),rgba(255,200,61,.08));box-shadow:inset 0 0 0 1px rgba(225,43,56,.35)"><div class="text-2xl shrink-0">\uD83D\uDD25</div><div class="min-w-0 flex-1"><div class="text-[14px] font-semibold text-chalk">Your ${u.streak}-day streak is at risk</div><div class="text-[12px] text-steel">Morph in today to keep it alive.${fz>0?` You\u2019ve got ${fz} freeze${fz===1?'':'s'} as backup \u2014 but why waste one?`:' No freezes left \u2014 don\u2019t break the chain!'}</div></div><button onclick="checkIn()" class="shrink-0 px-4 py-2 rounded-xl font-semibold text-sm text-ink bg-gradient-to-b from-[#ff5a4d] to-orchid hover:brightness-110">Morph in</button></section>`;
 }
 function onboardChecklist(u){
   if(u._hideChecklist) return '';
@@ -3164,12 +3171,13 @@ window.addEventListener('keydown', e=>{
   else if(e.key==='Escape' && paletteOpen){ closePalette(); }
 });
 /* ---- Stage 2 (not yet wired to Supabase): gate writes so nothing is silently lost ---- */
+async function notifyAll(msg, author){ try{ const body=(author?(author.username+': '):'')+String(msg||'').replace(/@all/ig,'').replace(/\s+/g,' ').trim(); const res=await fetch(SUPA_URL+'/functions/v1/notify-all',{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY,'apikey':SUPA_KEY}, body:JSON.stringify({ title:'House of MUSE', message:(body||'New announcement'), url:(location&&location.origin)||'' }) }); if(res && res.ok){ toast('Pushed to the whole squad \uD83D\uDCE3','gold'); } else { toast('Posted \u2014 @ALL phone push isn\u2019t set up yet','bad'); } }catch(e){ toast('Posted \u2014 @ALL phone push isn\u2019t set up yet','bad'); } }
 async function submitPost(){ const u=me(); const d=postDraft; const text=(d.text||'').trim(); let poll=null;
   if(d.poll){ const opts=d.poll.opts.map(o=>(o||'').trim()).filter(Boolean); if(opts.length>=2) poll={opts:opts.map(t=>({t,votes:[]}))}; }
   if(!text && !d.img && !poll){ toast('Write something first','bad'); return; }
   const { error } = await sb.from('posts').insert({ author_id:u.id, body:text, img_url:d.img||null, poll });
   if(error){ toast('Post failed: '+error.message,'bad'); console.error(error); return; }
-  postDraft={text:'',img:null,poll:null}; awardXP(u,5,'Posted in The Buzz'); await loadContent(); render(); toast('Posted','gold');
+  postDraft={text:'',img:null,poll:null}; awardXP(u,5,'Posted in The Buzz'); await loadContent(); render(); if(/@all\b/i.test(text)){ notifyAll(text,u); } else { toast('Posted','gold'); }
 }
 async function votePoll(postId,idx){ const u=me(); const p=(DB.posts||[]).find(x=>x.id===postId); if(!p||!p.poll) return;
   const had=p.poll.opts[idx].votes.includes(u.id); p.poll.opts.forEach(o=>{ o.votes=o.votes.filter(v=>v!==u.id); }); if(!had) p.poll.opts[idx].votes.push(u.id);

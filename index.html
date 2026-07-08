@@ -286,6 +286,7 @@ async function loadProfiles(user){ if(_profLoading) return; _profLoading=true;
     render(); subscribeProfiles(); subscribeContent();
     if(typeof linkPush==='function') linkPush();
     if(typeof checkSpotlight==='function') checkSpotlight();
+    if(typeof checkVaults==='function') checkVaults();
   } finally { _profLoading=false; }
 }
 async function refetchProfiles(){ if(!sb) return; let res; try{ res=await sb.from('profiles').select('*'); }catch(e){ return; }
@@ -720,6 +721,7 @@ function hqSpotlight(){ const F=(arr,label,color,glyph)=>arr.length?arr.map(m=>`
   return `<div class="rounded-2xl border border-gold/30 bg-gradient-to-b from-gold/10 to-transparent p-4 mb-5"><div class="text-[11px] uppercase tracking-[.2em] text-gold/80 mb-2">✨ Spotlight</div><div class="flex flex-wrap gap-2">${inner}</div></div>`;
 }
 const ICON = {
+  vault:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-full h-full"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="12" cy="12" r="3.4"/><path d="M12 8.6v1.2M12 14.2v1.2M15.4 12h1.2M7.4 12h1.2"/></svg>',
   spark:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-full h-full"><path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l3.5 3.5M15.5 15.5L19 19M19 5l-3.5 3.5M8.5 15.5L5 19"/></svg>',
   coin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-full h-full"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5a2.5 2 0 0 1 5 .2c0 1.5-2.5 1.6-2.5 2.8M9.5 14.5a2.5 2 0 0 0 5 .2" stroke-linecap="round"/></svg>',
   flame:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" class="w-full h-full"><path d="M12 3c1 3-2 4-2 7a2 2 0 1 0 4 0c0-1 .6-1.6 1-2 1 2 2 3 2 5a5 5 0 1 1-10 0c0-4 4-6 5-10z"/></svg>',
@@ -743,6 +745,7 @@ const NAV = [
   ['rooms','Comms','mic'],
   ['leaderboard','Leaderboard','trophy'],
   ['events','Missions','cal'],
+  ['vault','The Vault','vault'],
   ['challenges','Training','flame'],
   ['badges','Medals','check'],
   ['trophies','Achievements','trophy'],
@@ -754,7 +757,7 @@ const NAV = [
 function sidebar(){
   const u=me();
   const META={}; NAV.forEach(([id,label,ic])=>META[id]=[label,ic]); META['inbox']=['Inbox','bell'];
-  const order = ['dashboard','salon','battles','events','challenges','leaderboard','feed','rooms','badges','trophies','hall','store','inbox','settings'];
+  const order = ['dashboard','salon','battles','events','vault','challenges','leaderboard','feed','rooms','badges','trophies','hall','store','inbox','settings'];
   const item=(id)=>{ const mt=META[id]; if(!mt) return ''; const active=ROUTE===id; const un=id==='inbox'?unread(u):0;
     return `<button onclick="route('${id}')" aria-label="${mt[0]}" class="relative w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-left text-[14px] transition ${active?'text-chalk font-semibold':'text-silver hover:text-chalk hover:bg-raised/50'}" ${active?"style='background:linear-gradient(90deg,rgba(225,43,56,.22),rgba(225,43,56,.05));box-shadow:inset 0 0 0 1px rgba(225,43,56,.35),0 0 18px -6px rgba(225,43,56,.6)'":""}>
       ${active?"<span class='absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r bg-orchid'></span>":""}
@@ -1720,7 +1723,7 @@ function viewEvents(){
         <div class="text-right"><div class="font-mono text-3xl gold-text">${countdown(feat.starts_at)}</div><div class="text-[11px] text-steel">until it starts</div></div>
       </div>
     </div>`:''}
-    <div class="flex items-center justify-between gap-3 mb-4 flex-wrap"><div class="flex gap-2 flex-wrap">${cats.map(fbtn).join('')}</div>${newBtn}</div>
+    <div class="flex items-center justify-between gap-3 mb-4 flex-wrap"><div class="flex gap-2 flex-wrap">${cats.map(fbtn).join('')}</div>${newBtn}</div>${isStaff?eventImporter():''}
     <div class="text-[11px] uppercase tracking-wide text-steel mb-2">Active missions \u00b7 rotates automatically</div><div class="grid sm:grid-cols-2 gap-3">${poolMissionCards()}${cards}</div>
     ${editorOverlay()}
     ${footerLine()}
@@ -2729,7 +2732,122 @@ function uploadPic(input, kind){
   reader.readAsDataURL(file);
 }
 function clearPic(kind){ const u=me(); if(kind==='banner') u.bannerImg=null; else u.avatarImg=null; if(typeof upsertProfile==='function') upsertProfile(u); else save(); render(); toast('Removed'); }
-const VIEWS={dashboard:viewDashboard,profile:viewProfile,inbox:viewInbox,feed:viewFeed,salon:viewSalon,rooms:viewRooms,leaderboard:viewLeaderboard,battles:viewBattles,events:viewEvents,challenges:viewChallenges,badges:viewBadges,hall:viewHall,store:viewStore,settings:viewSettings,admin:viewAdmin,trophies:viewTrophies};
+/* ===================== THE VAULT (community event) ===================== */
+const VAULT_MILESTONES=[25000,50000,75000,100000,125000,150000,175000,200000];
+function vaultDefault(){ return {
+  status:'PREPARING', goal:200000, ratio:100, diamonds:0,
+  vaults:VAULT_MILESTONES.map((m,i)=>({milestone:m, title:i<7?('Vault '+(i+1)):'Grand Vault', prize:'', prizeDesc:'', status:'Locked', winnerId:null})),
+  contrib:{}, winners:[], notified:{}, audit:[]
+};}
+function vaultState(){ DB.app_config=DB.app_config||{}; if(!DB.app_config.vault) DB.app_config.vault=vaultDefault(); const v=DB.app_config.vault;
+  v.goal=v.goal||200000; v.ratio=v.ratio||100; v.diamonds=v.diamonds||0; v.status=v.status||'PREPARING'; v.contrib=v.contrib||{}; v.winners=v.winners||[]; v.notified=v.notified||{}; v.audit=v.audit||[];
+  if(!Array.isArray(v.vaults)||v.vaults.length!==8) v.vaults=vaultDefault().vaults;
+  return v; }
+function vaultSave(){ if(sb){ try{ sb.from('app_config').upsert({id:1,data:DB.app_config}).then(x=>{ if(x&&x.error) toast('Vault save failed: '+x.error.message,'bad'); }); }catch(e){} } }
+function vaultKeys(id){ const v=vaultState(); return Math.floor((v.contrib[id]||0)/(v.ratio||100)); }
+function vaultTotalKeys(){ const v=vaultState(); return Object.keys(v.contrib).reduce((s,id)=>s+Math.floor((v.contrib[id]||0)/(v.ratio||100)),0); }
+function vaultPct(){ const v=vaultState(); return Math.min(100, Math.round((v.diamonds/(v.goal||200000))*100)); }
+function isVaultAdmin(){ const u=me(); return !!(u&&(u.role==='Owner'||u.role==='Manager')); }
+function vaultRequireAdmin(){ if(!isVaultAdmin()){ toast('Owners & managers only','bad'); return false; } return true; }
+function vaultAudit(action,old_,new_,reason){ const v=vaultState(); const u=me(); v.audit.unshift({action, user:(u?u.username:'system'), ts:Date.now(), old:old_==null?'':String(old_), new:new_==null?'':String(new_), reason:reason||''}); if(v.audit.length>200) v.audit.length=200; }
+
+/* auto-unlock milestones + freeze at goal (owner-gated writer, called from render) */
+async function checkVaults(){ try{ const u=me(); if(!u||u.role!=='Owner'||!sb) return; DB.app_config=DB.app_config||{}; if(!DB.app_config.vault) return; const v=DB.app_config.vault; if(v.status!=='LIVE') return; let changed=false; const posts=[];
+  v.vaults.forEach((vt,i)=>{ if(v.diamonds>=vt.milestone && vt.status==='Locked'){ vt.status='Unlocked'; changed=true; const key='m'+vt.milestone; if(!v.notified[key]){ v.notified[key]=true; const isGrand=(i===7); posts.push(isGrand ? ('\uD83C\uDFC6 Grand Vault Unlocked! The community smashed '+vt.milestone.toLocaleString()+' Diamonds \u2014 the Vault Opening begins soon!') : ('\uD83D\uDD13 '+vt.title+' Unlocked! Community reached '+vt.milestone.toLocaleString()+' Diamonds!')); } } });
+  if(v.diamonds>=(v.goal||200000) && v.status==='LIVE'){ v.status='DRAWING'; changed=true; vaultAudit('Goal reached \u2014 entries frozen','LIVE','DRAWING','auto'); }
+  if(changed){ for(const b of posts){ try{ await sb.from('posts').insert({author_id:u.id, body:b, img_url:null, poll:null}); }catch(e){} } try{ await sb.from('app_config').upsert({id:1,data:DB.app_config}); }catch(e){} await loadContent(); render(); }
+}catch(e){ console.warn('vault',e); } }
+
+/* ---- admin actions ---- */
+function vaultSetStatus(s){ if(!vaultRequireAdmin()) return; const v=vaultState(); vaultAudit('Status change', v.status, s, ''); v.status=s; vaultSave(); render(); toast('Vault status: '+s,'gold'); }
+function vaultAdjustDiamonds(){ if(!vaultRequireAdmin()) return; const v=vaultState(); const inp=prompt('Add Diamonds (use a negative number to subtract):','0'); if(inp===null) return; const n=parseInt(inp)||0; const old=v.diamonds; v.diamonds=Math.max(0, v.diamonds+n); vaultAudit('Adjust diamonds', old, v.diamonds, 'admin'); vaultSave(); render(); toast((n>=0?'+':'')+n+' Diamonds','gold'); }
+function vaultSetDiamonds(){ if(!vaultRequireAdmin()) return; const v=vaultState(); const inp=prompt('Set total community Diamonds to:', v.diamonds); if(inp===null) return; const n=Math.max(0,parseInt(inp)||0); const old=v.diamonds; v.diamonds=n; vaultAudit('Set diamonds', old, n, 'admin'); vaultSave(); render(); }
+function vaultAddCoins(){ if(!vaultRequireAdmin()) return; const v=vaultState(); const sel=document.getElementById('vault_member'); const mid=sel?sel.value:''; if(!mid){ toast('Pick a member','bad'); return; } const inp=prompt('Coins to add for this member (100 Coins = 1 Key):','0'); if(inp===null) return; const n=parseInt(inp)||0; const old=v.contrib[mid]||0; v.contrib[mid]=Math.max(0, old+n); const mm=DB.members.find(x=>x.id===mid); vaultAudit('Add coins', old, v.contrib[mid], (mm?mm.username:mid)); vaultSave(); render(); toast((n>=0?'+':'')+n+' Coins logged','gold'); }
+function vaultEditPrize(i){ if(!vaultRequireAdmin()) return; const v=vaultState(); const vt=v.vaults[i]; if(!vt) return; const nm=prompt('Prize name for '+vt.title+':', vt.prize||''); if(nm===null) return; const ds=prompt('Prize description (optional):', vt.prizeDesc||''); vt.prize=nm.trim(); vt.prizeDesc=(ds===null?vt.prizeDesc:ds.trim()); vaultAudit('Edit prize', vt.title, vt.prize, ''); vaultSave(); render(); toast('Prize saved','gold'); }
+function vaultUnlock(i){ if(!vaultRequireAdmin()) return; const v=vaultState(); const vt=v.vaults[i]; if(!vt||vt.status==='Awarded') return; vt.status='Unlocked'; vaultAudit('Manual unlock', vt.title,'Unlocked',''); vaultSave(); render(); }
+function vaultLock(i){ if(!vaultRequireAdmin()) return; const v=vaultState(); const vt=v.vaults[i]; if(!vt||vt.status==='Awarded') return; vt.status='Locked'; vaultAudit('Manual lock', vt.title,'Locked',''); vaultSave(); render(); }
+
+/* ---- drawing (one win per member, Grand Vault last) ---- */
+function _vaultEntries(){ const v=vaultState(); const list=[]; Object.keys(v.contrib).forEach(id=>{ const k=Math.floor((v.contrib[id]||0)/(v.ratio||100)); for(let i=0;i<k;i++) list.push(id); }); return list; }
+function vaultDraw(i){ if(!vaultRequireAdmin()) return; const v=vaultState(); const vt=v.vaults[i]; if(!vt) return;
+  if(vt.status==='Locked'){ toast('Unlock this vault first','bad'); return; }
+  if(vt.winnerId){ toast('Already drawn \u2014 use Redraw','bad'); return; }
+  if(i===7){ const others=v.vaults.slice(0,7).filter(x=>x.status!=='Locked'); if(others.some(x=>!x.winnerId)){ toast('Draw all other unlocked vaults first \u2014 Grand draws last','bad'); return; } }
+  const entries=_vaultEntries(); if(!entries.length){ toast('No entries yet','bad'); return; }
+  const alreadyWon=new Set(v.winners.map(w=>w.memberId));
+  const pool=entries.filter(id=>!alreadyWon.has(id));
+  if(!pool.length){ toast('Everyone with entries has already won a vault','bad'); return; }
+  const winnerId=pool[Math.floor(Math.random()*pool.length)];
+  vt.winnerId=winnerId; vt.status='Awarded';
+  v.winners.push({vaultIdx:i, milestone:vt.milestone, memberId:winnerId, ts:Date.now()});
+  const mm=DB.members.find(x=>x.id===winnerId);
+  vaultAudit('Winner drawn', vt.title, (mm?mm.username:winnerId), 'system');
+  vaultSave();
+  if(sb){ try{ const u=me(); sb.from('posts').insert({author_id:u.id, body:'\uD83C\uDF89 '+(mm?mm.username:'A ranger')+' just won '+(vt.prize||vt.title)+' from '+vt.title+'! Congrats! \uD83D\uDDDD\uFE0F', img_url:null, poll:null}); }catch(e){} }
+  render(); toast('Winner: '+(mm?mm.username:'?'),'gold');
+}
+function vaultRedraw(i){ if(!vaultRequireAdmin()) return; const v=vaultState(); const vt=v.vaults[i]; if(!vt||!vt.winnerId) return; if(!confirm('Redraw the winner for '+vt.title+'? The current winner will be removed and a new one drawn.')) return; v.winners=v.winners.filter(w=>w.vaultIdx!==i); vt.winnerId=null; vt.status='Unlocked'; vaultAudit('Redraw', vt.title,'reset','admin'); vaultSave(); vaultDraw(i); }
+function vaultReset(){ if(!vaultRequireAdmin()) return; if(!confirm('End & reset The Vault? Current results are archived to history, then progress, keys, entries and winners reset for a fresh event.')) return; const v=vaultState(); DB.app_config.vaultHistory=DB.app_config.vaultHistory||[]; DB.app_config.vaultHistory.unshift({ended:Date.now(), goal:v.goal, diamonds:v.diamonds, winners:v.winners.map(w=>({title:(v.vaults[w.vaultIdx]||{}).title, prize:(v.vaults[w.vaultIdx]||{}).prize||'', member:((DB.members.find(m=>m.id===w.memberId)||{}).username)||w.memberId}))}); DB.app_config.vault=vaultDefault(); vaultSave(); render(); toast('Vault archived & reset','gold'); }
+
+/* ---- view ---- */
+function viewVault(){ const u=me(); const v=vaultState(); const admin=isVaultAdmin();
+  const pct=vaultPct(); const total=vaultTotalKeys(); const myKeys=u?vaultKeys(u.id):0; const chance=total>0?((myKeys/total)*100):0;
+  const stColors={PREPARING:'#9B93AE',LIVE:'#22c55e',DRAWING:'#FFC83D',FINISHED:'#E12B38'};
+  const statusBadge=`<span class="text-[11px] font-bold px-2.5 py-1 rounded-full" style="background:${stColors[v.status]}22;color:${stColors[v.status]}">${v.status}</span>`;
+  const vaultCards=v.vaults.map((vt,i)=>{ const won=vt.winnerId?DB.members.find(m=>m.id===vt.winnerId):null; const isGrand=(i===7);
+    const stateChip = vt.status==='Awarded'?`<span class="text-[10px] font-bold text-gold">AWARDED</span>`: vt.status==='Unlocked'?`<span class="text-[10px] font-bold text-emerald-300">UNLOCKED</span>`:`<span class="text-[10px] font-bold text-steel">LOCKED</span>`;
+    const glyph = vt.status==='Locked'?'\uD83D\uDD12':(vt.status==='Awarded'?'\uD83C\uDFC6':'\uD83D\uDD13');
+    return `<div class="rounded-2xl p-4 border bg-panel ${isGrand?'border-gold/50':'border-line'} ${vt.status==='Locked'?'opacity-70':''}" ${isGrand?'style="background:linear-gradient(160deg,rgba(255,200,61,.14),rgba(20,18,28,.9))"':''}>
+      <div class="flex items-center justify-between"><div class="text-[13px] font-bold text-chalk">${glyph} ${esc(vt.title)}</div>${stateChip}</div>
+      <div class="text-[11px] text-steel mt-0.5">${vt.milestone.toLocaleString()} Diamonds</div>
+      ${vt.prize?`<div class="text-[12px] text-silver mt-2">\uD83C\uDF81 ${esc(vt.prize)}</div>`:'<div class="text-[11px] text-steel mt-2 italic">Prize TBA</div>'}
+      ${vt.prizeDesc?`<div class="text-[11px] text-steel mt-0.5">${esc(vt.prizeDesc)}</div>`:''}
+      ${won?`<div class="text-[12px] text-gold mt-2 font-semibold">\uD83C\uDF8A Winner: ${esc(won.username)}</div>`:''}
+      ${admin?`<div class="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-line/50">
+        <button onclick="vaultEditPrize(${i})" class="text-[10px] px-2 py-1 rounded bg-raised text-steel hover:text-chalk">Edit prize</button>
+        ${vt.status==='Locked'?`<button onclick="vaultUnlock(${i})" class="text-[10px] px-2 py-1 rounded bg-emerald-500/20 text-emerald-300">Unlock</button>`:''}
+        ${vt.status==='Unlocked'?`<button onclick="vaultLock(${i})" class="text-[10px] px-2 py-1 rounded bg-raised text-steel">Lock</button>`:''}
+        ${vt.status!=='Locked'&&!vt.winnerId?`<button onclick="vaultDraw(${i})" class="text-[10px] px-2 py-1 rounded bg-gold/20 text-gold font-bold">Draw winner</button>`:''}
+        ${vt.winnerId?`<button onclick="vaultRedraw(${i})" class="text-[10px] px-2 py-1 rounded bg-rose/15 text-rose">Redraw</button>`:''}
+      </div>`:''}
+    </div>`; }).join('');
+  const board=[...DB.members].map(m=>({m, k:vaultKeys(m.id)})).filter(x=>x.k>0).sort((a,b)=>b.k-a.k).slice(0,10);
+  const boardHTML= board.length? board.map((x,i)=>`<div class="flex items-center gap-3 py-1.5"><span class="text-[12px] text-steel w-5">${i+1}</span>${avatarOf(x.m,28,colorHex(x.m.color))}<span class="text-[13px] text-chalk flex-1 truncate">${esc(x.m.username)}</span><span class="text-[12px] text-gold font-mono">${x.k} \uD83D\uDDDD\uFE0F</span></div>`).join('') : '<div class="text-[12px] text-steel py-3">No keys earned yet \u2014 be the first to contribute!</div>';
+  const memberOpts=DB.members.map(m=>`<option value="${m.id}">${esc(m.username)} (${vaultKeys(m.id)} keys)</option>`).join('');
+  const adminPanel = admin? `<details class="rounded-2xl border border-gold/30 bg-panel p-4 mt-5"><summary class="cursor-pointer text-[13px] font-bold text-gold select-none">\u2699\uFE0F Vault Admin</summary>
+    <div class="mt-3 space-y-3">
+      <div><div class="text-[10px] uppercase tracking-[.15em] text-steel mb-1">Event state</div><div class="flex flex-wrap gap-1.5">${['PREPARING','LIVE','DRAWING','FINISHED'].map(s=>`<button onclick="vaultSetStatus('${s}')" class="text-[11px] px-2.5 py-1 rounded-full ${v.status===s?'bg-orchid text-ink font-semibold':'bg-raised text-steel hover:text-chalk'}">${s}</button>`).join('')}</div></div>
+      <div class="flex flex-wrap gap-2 items-center"><button onclick="vaultAdjustDiamonds()" class="text-[11px] px-3 py-1.5 rounded-lg bg-raised text-chalk hover:brightness-110">+ / \u2212 Diamonds</button><button onclick="vaultSetDiamonds()" class="text-[11px] px-3 py-1.5 rounded-lg bg-raised text-chalk hover:brightness-110">Set Diamonds</button></div>
+      <div class="flex flex-wrap gap-2 items-center"><select id="vault_member" class="bg-ink border border-line rounded-lg px-2 py-1.5 text-sm max-w-[220px]">${memberOpts}</select><button onclick="vaultAddCoins()" class="text-[11px] px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300">Log coins \u2192 keys</button></div>
+      <button onclick="vaultReset()" class="text-[11px] px-3 py-1.5 rounded-lg bg-rose/15 text-rose">End & reset event</button>
+      ${v.audit.length?`<div class="pt-2 border-t border-line/50"><div class="text-[10px] uppercase tracking-[.15em] text-steel mb-1">Audit log (latest)</div>${v.audit.slice(0,8).map(a=>`<div class="text-[11px] text-steel">${new Date(a.ts).toLocaleString()} \u00b7 ${esc(a.user)} \u00b7 ${esc(a.action)}${(a.old!==''||a.new!=='')?(' ('+esc(a.old)+' \u2192 '+esc(a.new)+')'):''}${a.reason?(' \u00b7 '+esc(a.reason)):''}</div>`).join('')}</div>`:''}
+    </div></details>`:'';
+  return `<div class="max-w-3xl mx-auto">
+    <div class="flex items-center justify-between gap-3 mb-1"><h1 class="font-hero text-3xl orchid-text">THE VAULT</h1>${statusBadge}</div>
+    <p class="text-[13px] text-steel mb-4">Help the House hit ${v.goal.toLocaleString()} Diamonds. Every 100 Coins you contribute = 1 Vault Key = 1 entry into the drawings. Every member can play.</p>
+    <div class="rounded-2xl border border-line bg-panel p-5 mb-5">
+      <div class="flex items-end justify-between mb-2"><div class="text-[15px] font-bold text-chalk">\uD83D\uDC8E ${v.diamonds.toLocaleString()} <span class="text-steel font-normal">/ ${v.goal.toLocaleString()}</span></div><div class="text-[15px] font-bold text-gold">${pct}%</div></div>
+      <div class="h-3 rounded-full bg-ink overflow-hidden"><div class="h-full rounded-full transition-all" style="width:${pct}%;background:linear-gradient(90deg,#E12B38,#FFC83D)"></div></div>
+      <div class="text-[11px] text-steel mt-2">${v.status==='PREPARING'?'Event starts soon \u2014 get ready!':v.status==='LIVE'?'LIVE now \u2014 contributions are counting!':v.status==='DRAWING'?'Goal reached! Entries are frozen \u2014 the drawing is in progress.':'Event complete. See the winners below.'}</div>
+    </div>
+    ${u?`<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+      <div class="rounded-xl bg-raised p-3 text-center"><div class="text-[10px] uppercase tracking-wide text-steel">Your Coins</div><div class="text-lg font-bold text-chalk">${(v.contrib[u.id]||0).toLocaleString()}</div></div>
+      <div class="rounded-xl bg-raised p-3 text-center"><div class="text-[10px] uppercase tracking-wide text-steel">Vault Keys</div><div class="text-lg font-bold text-gold">${myKeys} \uD83D\uDDDD\uFE0F</div></div>
+      <div class="rounded-xl bg-raised p-3 text-center"><div class="text-[10px] uppercase tracking-wide text-steel">Entries</div><div class="text-lg font-bold text-chalk">${myKeys}</div></div>
+      <div class="rounded-xl bg-raised p-3 text-center"><div class="text-[10px] uppercase tracking-wide text-steel">Win Chance</div><div class="text-lg font-bold text-emerald-300">${chance.toFixed(1)}%</div></div>
+    </div>`:''}
+    <div class="text-[11px] uppercase tracking-[.18em] text-steel mb-2">Vaults</div>
+    <div class="grid sm:grid-cols-2 gap-3">${vaultCards}</div>
+    <div class="rounded-2xl border border-line bg-panel p-4 mt-5">
+      <div class="text-[11px] uppercase tracking-[.18em] text-steel mb-2">\uD83C\uDFC5 Top Key Holders</div>${boardHTML}
+      <div class="text-[11px] text-steel mt-2 pt-2 border-t border-line/50">Total keys in play: ${total} \u00b7 Contributors: ${board.length}</div>
+    </div>
+    ${adminPanel}
+  </div>`;
+}
+/* =================== END THE VAULT =================== */
+
+const VIEWS={dashboard:viewDashboard,vault:viewVault,profile:viewProfile,inbox:viewInbox,feed:viewFeed,salon:viewSalon,rooms:viewRooms,leaderboard:viewLeaderboard,battles:viewBattles,events:viewEvents,challenges:viewChallenges,badges:viewBadges,hall:viewHall,store:viewStore,settings:viewSettings,admin:viewAdmin,trophies:viewTrophies};
 function route(name){ if(activeRoom) disposeCall(); ROUTE=name; render(); window.scrollTo({top:0,behavior:'smooth'}); }
 var paletteOpen=false, palQuery='';
 function openPalette(){ paletteOpen=true; palQuery=''; render(); }
@@ -3074,6 +3192,31 @@ async function saveBattleForm(){ const g=id=>{const e=document.getElementById(id
 async function deleteBattle(id){ if(!confirm('Delete this battle?')) return; const { error } = await sb.from('battles').delete().eq('id',id); if(error){ toast(error.message,'bad'); return; } editing=null; await loadContent(); render(); toast('Battle removed'); }
 function newEvent(){ editing={kind:'event', id:null, title:'', category:'Live', platform:'Discord', starts_at:Date.now()+86400000, reward:120, desc:''}; render(); }
 function newChallenge(){ editing={kind:'challenge', id:null, title:'', desc:'', xp:80, coins:25, badge:''}; render(); }
+function eventImporter(){ const IN='w-full bg-ink border border-line rounded-lg px-3 py-2 text-sm'; return `<details class="mb-4 bg-panel border border-line rounded-2xl p-4"><summary class="cursor-pointer text-[13px] font-semibold text-gold select-none">+ Bulk-import a schedule</summary><div class="mt-3 space-y-2"><p class="text-[11px] text-steel">Paste rows from your sheet, one per line: <span class="text-silver">Date &nbsp;\u00b7&nbsp; Event &nbsp;\u00b7&nbsp; Topic</span> (tab-separated). Header rows are skipped. All become Discord events.</p><div class="flex items-center gap-2 flex-wrap"><label class="text-[11px] text-steel">Default time</label><input id="ev_time" value="8:00 PM" class="w-28 bg-ink border border-line rounded-lg px-2 py-1.5 text-sm"/><span class="text-[10px] text-steel">applied to all (edit each after)</span></div><textarea id="ev_bulk" rows="6" placeholder="Mon, July 6&#9;Creator Workshop&#9;Monthly Kickoff & Creator Goal Setting" class="${IN} font-mono text-[12px]"></textarea><button onclick="importEvents()" class="w-full py-2.5 rounded-xl font-bold text-ink bg-gradient-to-b from-[#ff5a4d] to-orchid hover:brightness-110">Import events</button></div></details>`; }
+async function importEvents(){ const u=me(); if(!u||(u.role!=='Owner'&&u.role!=='Manager')){ toast('Owners & managers only','bad'); return; }
+  const ta=document.getElementById('ev_bulk'); const raw=(ta&&ta.value||'').trim(); if(!raw){ toast('Paste your schedule first','bad'); return; }
+  const tv=(document.getElementById('ev_time')||{}).value||'8:00 PM'; const tm=String(tv).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i); let hh=20,mm=0; if(tm){ hh=+tm[1]; mm=+tm[2]; const ap=(tm[3]||'').toUpperCase(); if(ap==='PM'&&hh<12)hh+=12; if(ap==='AM'&&hh===12)hh=0; }
+  const MO={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11}; const now=new Date(); const rows=[]; let skipped=0;
+  raw.split(/\n+/).forEach(line=>{ line=line.replace(/\r/g,'').trim(); if(!line) return;
+    if(/^date\b/i.test(line) && /topic/i.test(line)){ return; }
+    const cells=line.split('\t').map(x=>x.trim()); if(cells.length<2){ skipped++; return; }
+    const mM=cells[0].match(/([A-Za-z]{3,9})\s+(\d{1,2})/); if(!mM){ skipped++; return; }
+    const mo=MO[mM[1].slice(0,3).toLowerCase()]; const da=+mM[2]; if(mo==null){ skipped++; return; }
+    const evtype=(cells[1]||'').replace(/[^\x00-\x7F]/g,'').trim(); const topic=(cells[2]||cells[1]||'').trim();
+    const when=new Date(now.getFullYear(),mo,da,hh,mm); if(isNaN(when.getTime())){ skipped++; return; }
+    let reward=120, intro=''; const et=evtype.toLowerCase();
+    if(/workshop/.test(et)){ reward=150; intro='Creator Workshop \u2014 open to every member of the House'; }
+    else if(/learning|session|class|lesson|training/.test(et)){ reward=130; intro='Learning Session \u2014 all members welcome'; }
+    else if(/trivia|game|kahoot|bingo|jackbox|feud|quiz/.test(et)){ reward=100; intro='Community Game Night \u2014 the whole squad is invited'; }
+    else if(/community|night|mixer|showcase|hangout|social|watch|talent/.test(et)){ reward=110; intro='Community Night \u2014 for the whole House'; }
+    else { reward=120; intro='House event \u2014 all members welcome'; }
+    const desc = intro + '. ' + (topic?('Focus: '+topic+'. '):'') + 'Every member can RSVP and join \u2014 hop in, take part, and earn Power for showing up.';
+    rows.push({ title:topic||evtype||'Event', category:evtype||'Event', platform:'Discord', starts_at:when.toISOString(), reward, descr:desc });
+  });
+  if(!rows.length){ toast('Couldn\u2019t read any events \u2014 paste rows as Date [tab] Event [tab] Topic','bad'); return; }
+  const res=await sb.from('events').insert(rows); if(res.error){ toast('Import failed: '+res.error.message,'bad'); return; }
+  if(ta) ta.value=''; await loadContent(); render(); toast('Imported '+rows.length+' event'+(rows.length===1?'':'s')+(skipped?(' \u00b7 skipped '+skipped):'')+' 🎉','gold');
+}
 async function saveEventForm(){ const g=id=>{const e=document.getElementById(id);return e?e.value:'';};
   const sd=new Date(g('ed_start')); const starts=isNaN(sd)?new Date(Date.now()+86400000).toISOString():sd.toISOString();
   const row={ title:g('ed_title').trim()||'Mission', category:g('ed_cat'), platform:g('ed_plat'), starts_at:starts, reward:parseInt(g('ed_reward'))||120, descr:g('ed_desc').trim() };

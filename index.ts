@@ -1,8 +1,7 @@
-// Supabase Edge Function: notify-all
-// Broadcasts a push notification to every subscribed device via OneSignal.
-// The House of MUSE app calls this automatically whenever someone posts "@ALL" in The Buzz.
-//
-// Deploy steps are in VAULT-and-PUSH-setup.md (same folder).
+// Supabase Edge Function: notify-owner
+// Sends a push ONLY to devices tagged role = Owner or Manager.
+// The app tags each device automatically (linkPush) with the signed-in user's role,
+// and calls this whenever a member submits something that needs review.
 
 const ONESIGNAL_APP_ID = "da44b2ad-257a-4baf-a202-82f933238f91";
 
@@ -13,9 +12,7 @@ const cors = {
 };
 
 Deno.serve(async (req) => {
-  // Handle the browser's CORS preflight
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "POST only" }), {
       status: 405, headers: { ...cors, "Content-Type": "application/json" },
@@ -33,14 +30,17 @@ Deno.serve(async (req) => {
   try { payload = await req.json(); } catch (_) { /* ignore */ }
 
   const title = (payload.title || "House of MUSE").slice(0, 120);
-  const message = (payload.message || "New announcement").slice(0, 500);
+  const message = (payload.message || "Something needs your review").slice(0, 500);
   const url = payload.url || "";
 
   const body: Record<string, unknown> = {
     app_id: ONESIGNAL_APP_ID,
-    // "Subscribed Users" works on most apps; newer OneSignal dashboards call it
-    // "Total Subscriptions". If you get a "segment not found" error, swap the name.
-    included_segments: ["Subscribed Users"],
+    // Only reach devices whose role tag is Owner or Manager
+    filters: [
+      { field: "tag", key: "role", relation: "=", value: "Owner" },
+      { operator: "OR" },
+      { field: "tag", key: "role", relation: "=", value: "Manager" },
+    ],
     headings: { en: title },
     contents: { en: message },
   };
@@ -56,6 +56,8 @@ Deno.serve(async (req) => {
       body: JSON.stringify(body),
     });
     const data = await res.json();
+    // OneSignal returns 200 with "errors: All included players are not subscribed"
+    // when no owner device is registered yet — that's fine, not a failure.
     return new Response(JSON.stringify(data), {
       status: res.ok ? 200 : res.status,
       headers: { ...cors, "Content-Type": "application/json" },
